@@ -33,6 +33,17 @@ button:hover{border-color:var(--acc);color:var(--acc)}button.go{background:var(-
 .cap{font-size:11px;color:var(--mut);margin:14px 0 2px;letter-spacing:.09em;text-transform:uppercase;border-top:1px dashed var(--line);padding-top:12px}
 table{border-collapse:collapse;font:13px ui-monospace,Menlo,monospace;margin:auto}td,th{border:1px solid var(--line);padding:4px 12px;text-align:center}th{background:var(--bg)}
 footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 30px;color:var(--mut);font-size:13px;text-align:center}
+.stk [data-net]{cursor:pointer}
+.stk.hlon [data-net]{opacity:.25}
+.stk.hlon [data-net].hl{opacity:1;filter:drop-shadow(0 0 3px #f97316)}
+.stk .rg.hl{stroke:#f97316;stroke-width:3}
+.netinfo{min-height:22px;font-size:13px;color:var(--mut);margin:4px 0 8px}
+details.val{text-align:left;font-size:13px;margin:6px 0;border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+details.val summary{cursor:pointer;font-weight:600}details.val.ok summary{color:#15803d}details.val.bad summary{color:#c0392b}
+details.val ul{margin:8px 0 2px;padding-left:18px}li.bad{color:#c0392b}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--mut);margin-left:6px}
+@media print{#st{display:none}details.val{display:none}}
+.eu{text-align:left;font-size:13px;line-height:1.7}.eu p{margin:6px 0}
 @media print{header.top,#inp,footer,.dlb{display:none}body{background:#fff}.card{box-shadow:none;break-inside:avoid}}
 </style></head><body>
 <header class="top"><div class="wrap nav"><span class="logo">C</span>CMOS Studio<small>Runs in your browser</small></div></header>
@@ -41,10 +52,11 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 30px;colo
 <p>Paste an equation or a whole question. Get the pull-up and pull-down networks with source and drain marked, the stick diagram, and a truth table.</p></section>
 <div class="card" id="inp">
 <textarea id="eq" rows="2" spellcheck="false" aria-label="Equation">\(Z=\overline{AB+CD}\)</textarea>
-<div class="row"><button class="go" id="draw">Draw</button><button id="clr">Clear</button><button onclick="window.print()">Print / save PDF</button></div>
+<div class="row"><button class="go" id="draw">Draw</button><button id="clr">Clear</button><button onclick="window.print()">Print / save PDF</button><button id="tst">Run self-test</button><label class="chk"><input type="checkbox" id="eu"> Euler path ordering</label><label class="chk"><input type="checkbox" id="sd" checked> Show source/drain labels</label></div>
 <div class="lbl">Presets</div><div class="row" id="pre"></div>
 <div class="help">Accepts LaTeX copied from a question (<code>\( Z=\overline{AB+CD} \)</code>, <code>\cdot</code>, <code>\oplus</code>) or plain text (<code>Z=!(AB+CD)</code>). <b>+</b> is OR, letters together or <b>*</b> is AND, <b>'</b> or <b>!</b> is NOT. Several <code>\( … \)</code> equations in one paste are each drawn.</div>
 <div id="err"></div></div>
+<div id="st"></div>
 <div id="out"></div>
 </main>
 <footer><div class="wrap">CMOS Studio · static page, no server, no data leaves your browser</div></footer>
@@ -102,6 +114,7 @@ ${dr(u,ax-wp*CW/2,py,true,0)}<path d="M${ax} ${y1}V${ny}M${ax} ${oy}H${ax+W/2+50
 <circle cx="${ax+W/2+54}" cy="${oy}" r="4"/><text x="${ax+W/2+64}" y="${oy+5}" style="stroke:none;font-weight:700">${S.out}</text>
 ${dr(g,ax-wn*CW/2,ny,false,0)}<path d="M${ax} ${y2}V${y2+10}M${ax-16} ${y2+10}H${ax+16}M${ax-10} ${y2+16}H${ax+10}M${ax-4} ${y2+22}H${ax+4}"/><text x="${ax+24}" y="${y2+22}" style="stroke:none">GND</text></svg>`}
 /* stick */
+const INFO=[];
 function net(n,a,b,Lst,c){if(n.t=='lit'){Lst.push({n,a,b});return}
 if(n.t=='or'){n.c.forEach(x=>net(x,a,b,Lst,c));return}
 let p=a;n.c.forEach((x,i)=>{const q=i==n.c.length-1?b:c.pre+c.k++;net(x,p,q,Lst,c);p=q})}
@@ -109,75 +122,195 @@ const lf=(t,o)=>o?t.b:t.a,rt=(t,o)=>o?t.a:t.b;
 function chain(seq,f){const n=seq.length,dp=[f==null?[0,0]:(f?[1e9,0]:[0,1e9])],bp=[[0,0]];
 for(let i=1;i<n;i++){dp[i]=[];bp[i]=[];for(let o=0;o<2;o++){let b=1e9,bo=0;for(let q=0;q<2;q++){const c=dp[i-1][q]+(lf(seq[i],o)==rt(seq[i-1],q)?0:1);if(c<b){b=c;bo=q}}dp[i][o]=b;bp[i][o]=bo}}
 let o=dp[n-1][0]<=dp[n-1][1]?0:1;const cost=dp[n-1][o],ori=[];for(let i=n-1;i>=0;i--){ori[i]=o;o=bp[i][o]}return{cost,ori}}
-function stick(S){const g=S.g,u=dual(g),Ln=[],Lp=[];
+const GW=6;
+/* one diffusion row: regions (between gates), continuous strips, breaks */
+function mkRow(seq,ori,X,P){const regs=[],segs=[],brks=[],N=seq.length;
+let r0={net:lf(seq[0],ori[0]),x1:X(0)-P/2-12,cx:X(0)-P/2},st=r0.x1;
+for(let k=0;k<N;k++){const x=X(k);r0.x2=x-GW;regs.push(r0);const rn=rt(seq[k],ori[k]);
+if(k==N-1){r0={net:rn,x1:x+GW,x2:x+P/2+12,cx:x+P/2};regs.push(r0);segs.push([st,r0.x2]);break}
+const l=lf(seq[k+1],ori[k+1]),mx=(x+X(k+1))/2;
+if(rn==l)r0={net:rn,x1:x+GW,cx:mx};
+else{regs.push({net:rn,x1:x+GW,x2:mx-10,cx:mx-22});segs.push([st,mx-10]);brks.push(mx);r0={net:l,x1:mx+10,cx:mx+22};st=mx+10}}
+return{regs,segs,brks}}
+const evg=(n,e)=>n.t=='lit'?(!!e[n.v])!==!!n.neg:n.t=='and'?n.c.every(c=>evg(c,e)):n.c.some(c=>evg(c,e));
+/* switch-level simulation of a transistor list; gate names like A or A' */
+function simT(trs,vd,gd,out,fn){if(vd<0||gd<0||out<0)return{ok:false,msg:'VDD, GND or output is not reached by metal'};
+const bs=g=>g.replace(/'$/,''),vs=[...new Set(trs.map(t=>bs(t.g)))];
+for(let m=0;m<1<<vs.length;m++){const e={};vs.forEach((v,i)=>e[v]=!!(m>>i&1));
+const on=trs.filter(t=>{const g=e[bs(t.g)]!==/'$/.test(t.g);return t.type=='n'?g:!g});
+const rc=s=>{const R=new Set([s]);let ch=1;while(ch){ch=0;on.forEach(t=>{if(R.has(t.s)!==R.has(t.d)){R.add(t.s);R.add(t.d);ch=1}})}return R};
+const a=rc(vd),b=rc(gd),hi=a.has(out),lo=b.has(out),asg=vs.map(v=>v+'='+ +e[v]).join(' ');
+if(a.has(gd))return{ok:false,msg:`VDD–GND short when ${asg}`};
+if(hi&&lo)return{ok:false,msg:`output tied to both rails when ${asg}`};
+if(!hi&&!lo)return{ok:false,msg:`output floating when ${asg}`};
+if(hi!==fn(e))return{ok:false,msg:`wrong output when ${asg}`}}
+return{ok:true,msg:`all ${1<<vs.length} input combinations give the correct output`}}
+function stick(S,opt){opt=opt||{};const g=S.g,u=dual(g),Ln=[],Lp=[];
 net(g,'OUT','GND',Ln,{k:1,pre:'n'});net(u,'VDD','OUT',Lp,{k:1,pre:'p'});
 const N=Ln.length,bn={},bp={};Ln.forEach(t=>bn[t.n.id]=t);Lp.forEach(t=>bp[t.n.id]=t);
+const fn=e=>!evg(g,e),mk=(w,t)=>({type:w,g:L(t.n),s:t.a,d:t.b,id:t.n.id});
+const sch=[...Ln.map(t=>mk('n',t)),...Lp.map(t=>mk('p',t))];
 const LM=140,P=100,M=210,X=k=>M+k*P+P/2,RX=M+N*P+72,W=Math.max(RX+70,520);
-let ord=[...Array(N).keys()],bc=1e9,bf=[0,0];
-function row(by,pm,od=ord,f){const seq=od.map(i=>by[i]),{ori}=chain(seq,f),cs=[],seg=[],lb=[];let st=0;
-seq.forEach((t,k)=>{const o=ori[k],l=lf(t,o),r=rt(t,o),sa=pm?'S':'D',sb=pm?'D':'S';lb.push(o?[sb,sa]:[sa,sb]);
-if(k==0){cs.push({net:l,x:X(0)-P/2});st=cs[0].x}
-else{const pr=rt(seq[k-1],ori[k-1]),mx=(X(k-1)+X(k))/2;
-if(pr==l)cs.push({net:l,x:mx});else{cs.push({net:pr,x:mx-16});seg.push([st,mx-16]);cs.push({net:l,x:mx+16});st=mx+16}}
-if(k==N-1){cs.push({net:r,x:X(k)+P/2});seg.push([st,X(k)+P/2])}});return{cs,seg,lb}}
-const cnt=(R,re)=>{const m={};R.cs.forEach(c=>m[c.net]=(m[c.net]||0)+1);return Object.keys(m).filter(k=>re.test(k)&&m[k]>1)};
-const xing=(R,re)=>{const mp={};R.cs.forEach(c=>(mp[c.net]=mp[c.net]||[]).push(c.x));const ks=Object.keys(mp).filter(k=>re.test(k)&&mp[k].length>1);let n=0;
+const MB='#1e50d8',RD='#dc2626',PU='#7c3aed',PF='#f4d03f',NF='#3fae6a',FF='font-family:system-ui,sans-serif;';
+const rowsFor=(o,f1,f2)=>{const sp=o.map(i=>bp[i]),sn=o.map(i=>bn[i]),cp=chain(sp,f1),cn=chain(sn,f2);return{cp,cn,Rp:mkRow(sp,cp.ori,X,P),Rn:mkRow(sn,cn.ori,X,P)}};
+const need=(R,re)=>{const m={};R.regs.forEach(r=>m[r.net]=(m[r.net]||0)+1);return Object.keys(m).filter(k=>re.test(k)&&m[k]>1)};
+const xing=(R,re)=>{const mp={};R.regs.forEach(c=>(mp[c.net]=mp[c.net]||[]).push(c.cx));const ks=Object.keys(mp).filter(k=>re.test(k)&&mp[k].length>1);let n=0;
 ks.forEach((k,i)=>{const lo=Math.min(...mp[k]),hi=Math.max(...mp[k]);Object.keys(mp).forEach(j=>{if(j==k||j=='OUT')return;if(!(!re.test(j)||ks.indexOf(j)>i))return;mp[j].forEach(x=>{if(x>lo&&x<hi)n++})})});return n};
-const tryO=o=>{for(let f1=0;f1<2;f1++)for(let f2=0;f2<2;f2++){const a=chain(o.map(i=>bp[i]),f1).cost+chain(o.map(i=>bn[i]),f2).cost;const c=a*1000+2*xing(row(bp,1,o,f1),/^p\d/)+xing(row(bn,0,o,f2),/^n\d/);if(c<bc||(c==bc&&o.join()<ord.join())){bc=c;ord=[...o];bf=[f1,f2]}}};
-if(N<=7){const a=[...Array(N).keys()];(function pm(k){if(k==N){tryO(a);return}for(let i=k;i<N;i++){[a[k],a[i]]=[a[i],a[k]];pm(k+1);[a[k],a[i]]=[a[i],a[k]]}})(0)}else tryO(ord);
-const Rp=row(bp,1,ord,bf[0]),Rn=row(bn,0,ord,bf[1]);
-const ip=cnt(Rp,/^p\d/),inn=cnt(Rn,/^n\d/);
+/* electrical correctness first, then diffusion breaks, then metal crossings */
+const cands=[],addC=o=>{for(let f1=0;f1<2;f1++)for(let f2=0;f2<2;f2++){const r=rowsFor(o,f1,f2);cands.push({o:[...o],f1,f2,c:(r.cp.cost+r.cn.cost)*1000+2*xing(r.Rp,/^p\d/)+xing(r.Rn,/^n\d/)})}};
+const a=[...Array(N).keys()],lab=i=>L(bn[i].n),bs=x=>lab(x).replace(/'/g,'');
+a.sort((x,y)=>bs(x)<bs(y)?-1:bs(x)>bs(y)?1:x-y);
+const eg=Lst=>Lst.map(t=>({id:t.n.id,lab:L(t.n),u:t.a,v:t.b}));
+function trails(E,cap){const out=[],used=new Set(),path=[];
+function dfs(v){if(out.length>=cap)return;if(path.length==E.length){out.push(path.map(x=>({...x})));return}
+for(const e of E){if(used.has(e.id))continue;let to=null;if(e.u===v)to=e.v;else if(e.v===v)to=e.u;else continue;used.add(e.id);path.push({id:e.id,lab:e.lab,from:v,to});dfs(to);path.pop();used.delete(e.id)}}
+[...new Set(E.flatMap(e=>[e.u,e.v]))].forEach(dfs);return out}
+let EU=null;
+if(opt.euler&&N>1){const En=eg(Ln),Ep=eg(Lp),tn=trails(En,20000),tp=trails(Ep,20000),kp=new Set(tp.map(t=>t.map(x=>x.id).join())),seen=new Set(),common=[];
+tn.forEach(t=>{const k=t.map(x=>x.id).join();if(kp.has(k)&&!seen.has(k)){seen.add(k);common.push(k.split(',').map(Number))}});
+EU={En,Ep,tn,tp,common};
+if(common.length)common.slice(0,800).forEach(addC);
+else if(N<=7)(function pm(k){if(k==N){addC(a);return}for(let i=k;i<N;i++){[a[k],a[i]]=[a[i],a[k]];pm(k+1);[a[k],a[i]]=[a[i],a[k]]}})(0);
+else addC(a)}
+else addC(a);
+cands.sort((x,y)=>x.c-y.c||(x.o.map(lab).join()<y.o.map(lab).join()?-1:1));
+function build({o,f1,f2}){const{Rp,Rn,cp,cn}=rowsFor(o,f1,f2),ip=need(Rp,/^p\d/),inn=need(Rn,/^n\d/);
 const rv=64,pt=rv+60,pY=pt+64+26*Math.max(ip.length-1,0),oY=pY+100,nY=oY+100,lastT=nY+54+28*Math.max(inn.length-1,0),pb=lastT+36,rg=lastT+98,H=rg+100;
-const MB='#1e50d8',RD='#dc2626',YP='#f0b820',GN='#2aa85a',PU='#7c3aed',FF='font-family:system-ui,sans-serif;';
-let d='',po='',me='',co='',ju='',lb='';const pts={};
-const rd=(R,y,fill,ly)=>{R.seg.forEach(([a,b])=>d+=`<rect x="${a-12}" y="${y-20}" width="${b-a+24}" height="40" fill="${fill}"/>`);
-R.cs.forEach(c=>{if(/^[pn]\d/.test(c.net)&&!(ip.includes(c.net)||inn.includes(c.net)))return;(pts[c.net]=pts[c.net]||[]).push({x:c.x,y})});
-R.lb.forEach((q,k)=>{lb+=`<text x="${X(k)-12}" y="${ly}" text-anchor="end" style="font-weight:700;font-size:12px">${q[0]}</text><text x="${X(k)+12}" y="${ly}" style="font-weight:700;font-size:12px">${q[1]}</text>`})};
-rd(Rp,pY,YP,pY-27);rd(Rn,nY,GN,nY+39);
-const names=[];
-for(let k=0;k<N;k++){const t=bn[ord[k]],x=X(k);names.push(L(t.n));po+=`<rect x="${x-5}" y="${pt}" width="10" height="${pb-pt}" fill="${RD}"/>`;lb+=`<text x="${x}" y="${pt-12}" text-anchor="middle" style="${FF}font-size:20px;font-weight:700;fill:${RD}">${L(t.n)}</text>`}
-const ln=(x1,y1,x2,y2,c=MB)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="6"/>`;
-let jn=0;
-for(const [nm,a] of Object.entries(pts)){
-if(nm=='VDD'){a.forEach(q=>me+=ln(q.x,q.y,q.x,rv));continue}
-if(nm=='GND'){a.forEach(q=>me+=ln(q.x,q.y,q.x,rg));continue}
-const xs=a.map(q=>q.x),lo=Math.min(...xs),hi=Math.max(...xs);
-if(nm=='OUT'){a.forEach(q=>{me+=ln(q.x,q.y,q.x,oY)+`<circle cx="${q.x}" cy="${oY}" r="6.5" fill="${MB}"/>`});me+=ln(lo,oY,RX,oY)+`<text x="${RX+14}" y="${oY+7}" style="${FF}font-size:21px;font-weight:700;fill:${MB}">${S.out}</text>`;continue}
-if(a.length<2)continue;
-const pr=nm[0]=='p',ar=pr?ip:inn,idx=ar.indexOf(nm),ty=pr?pY-44-28*idx:nY+54+28*idx;
-let cross=false;Object.entries(pts).forEach(([j,bb])=>{if(j==nm||j=='OUT')return;const rail=j=='VDD'||j=='GND';if(rail?(pr?j=='VDD':j=='GND'):(j[0]==nm[0]&&bb.length>1&&ar.indexOf(j)>idx))bb.forEach(q=>{if(q.x>lo&&q.x<hi)cross=true})});
-a.forEach(q=>me+=ln(q.x,q.y,q.x,ty));
-if(cross){jn++;ju+=ln(lo,ty,hi,ty,PU);a.forEach(q=>ju+=`<rect x="${q.x-9}" y="${ty-9}" width="18" height="18" fill="#fff" stroke="${PU}" stroke-width="3.5"/>`);lb+=`<text x="${lo+14}" y="${ty+(pr?-14:32)}" style="${FF}font-size:15px;font-weight:700;fill:${PU}">m${jn}</text>`}
-else{me+=ln(lo,ty,hi,ty);lb+=`<text x="${lo+14}" y="${ty+(pr?-12:28)}" style="${FF}font-size:15px;font-weight:700;fill:${MB}">${nm}</text>`}}
-for(const a of Object.values(pts))a.forEach(q=>co+=`<rect x="${q.x-12}" y="${q.y-12}" width="24" height="24" fill="#fff" stroke="#111" stroke-width="3"/><path d="M${q.x-12} ${q.y-12}L${q.x+12} ${q.y+12}M${q.x+12} ${q.y-12}L${q.x-12} ${q.y+12}" stroke="#111" stroke-width="3"/>`);
-const rail=(y,txt)=>`<rect x="${LM}" y="${y-9}" width="${RX-LM}" height="18" fill="${MB}"/><text x="${LM-12}" y="${y+6}" text-anchor="end" style="${FF}font-size:17px;font-weight:700;fill:${MB}">${txt}</text>`;
-const side=(y,a,b,c)=>`<text x="${LM-12}" y="${y-3}" text-anchor="end" style="${FF}font-size:14px;fill:${c}">${a}</text><text x="${LM-12}" y="${y+14}" text-anchor="end" style="${FF}font-size:14px;fill:${c}">${b}</text>`;
-const ly=rg+52,it=[['Metal',`<rect x="0" y="-5" width="22" height="10" fill="${MB}"/>`],['Poly',`<rect x="0" y="-5" width="22" height="10" fill="${RD}"/>`],['n-diff',`<rect x="0" y="-5" width="22" height="10" fill="${GN}"/>`],['p-diff',`<rect x="0" y="-5" width="22" height="10" fill="${YP}"/>`],['Contact',`<rect x="4" y="-7" width="14" height="14" fill="#fff" stroke="#111" stroke-width="2"/><path d="M4 -7L18 7M18 -7L4 7" stroke="#111" stroke-width="2"/>`],['Metal-2 jumper',`<rect x="0" y="-3" width="22" height="6" fill="${PU}"/>`],['Via',`<rect x="4" y="-7" width="14" height="14" fill="#fff" stroke="${PU}" stroke-width="3"/>`]];
+const regs=[];[['p',Rp,pY],['n',Rn,nY]].forEach(([w,R,y])=>R.regs.forEach(r=>{r.row=w;r.y=y;r.id=regs.length;r.ct=!/^[pn]\d/.test(r.net)||(w=='p'?ip:inn).includes(r.net);regs.push(r)}));
+const tyf=(nt,w)=>nt=='VDD'?rv:nt=='GND'?rg:nt=='OUT'?oY:(w=='p'?pY-44-28*ip.indexOf(nt):nY+54+28*inn.indexOf(nt));
+const cts=regs.filter(r=>r.ct).map(r=>({x:r.cx,y:r.y,net:r.net,row:r.row,ty:tyf(r.net,r.row)}));
+const tks=[...new Set(cts.filter(c=>/^[pn]\d/.test(c.net)).map(c=>c.net))].map(nm=>{const cc=cts.filter(c=>c.net==nm);return{nm,y:cc[0].ty,lo:Math.min(...cc.map(c=>c.x)),hi:Math.max(...cc.map(c=>c.x))}});
+tks.forEach(t=>t.j=cts.some(c=>c.net!=t.nm&&c.x>=t.lo&&c.x<=t.hi&&Math.min(c.y,c.ty)<t.y&&t.y<Math.max(c.y,c.ty)));
+const m1=[{x1:LM,y1:rv,x2:RX,y2:rv,w:18,rail:1,nm:'VDD'},{x1:LM,y1:rg,x2:RX,y2:rg,w:18,rail:1,nm:'GND'}];
+cts.forEach(c=>m1.push({x1:c.x,y1:c.y,x2:c.x,y2:c.ty,w:6,nm:c.net}));
+m1.push({x1:Math.min(...cts.filter(c=>c.net=='OUT').map(c=>c.x)),y1:oY,x2:RX,y2:oY,w:6,nm:'OUT'});
+const m2=[],vias=[];
+tks.forEach(t=>{const s={x1:t.lo,y1:t.y,x2:t.hi,y2:t.y,w:6,nm:t.nm};if(t.j){const j=m2.push(s)-1;cts.filter(c=>c.net==t.nm).forEach(c=>vias.push({x:c.x,y:t.y,j}))}else m1.push(s)});
+const poly=o.map((i,k)=>({x:X(k),y1:pt,y2:pb,lab:L(bn[i].n),tid:bn[i].n.id}));
+/* ---- extraction purely from geometry ---- */
+const R0=regs.length,m20=R0+m1.length,par=[...Array(m20+m2.length).keys()];
+const fd=x=>{while(par[x]!=x)x=par[x]=par[par[x]];return x},un=(p,q)=>{par[fd(p)]=fd(q)};
+const bb=s=>[Math.min(s.x1,s.x2)-s.w/2,Math.min(s.y1,s.y2)-s.w/2,Math.max(s.x1,s.x2)+s.w/2,Math.max(s.y1,s.y2)+s.w/2];
+const hit=(s,x,y)=>{const q=bb(s);return x>=q[0]&&x<=q[2]&&y>=q[1]&&y<=q[3]};
+const ovl=(s,t)=>{const p=bb(s),q=bb(t);return p[0]<=q[2]&&q[0]<=p[2]&&p[1]<=q[3]&&q[1]<=p[3]};
+m1.forEach((s,i)=>m1.forEach((t,j)=>{if(j>i&&ovl(s,t))un(R0+i,R0+j)}));
+m2.forEach((s,i)=>m2.forEach((t,j)=>{if(j>i&&ovl(s,t))un(m20+i,m20+j)}));
+cts.forEach(c=>{const r=regs.find(r=>r.row==c.row&&c.x>=r.x1&&c.x<=r.x2&&Math.abs(c.y-r.y)<=20);if(!r)return;c.rid=r.id;m1.forEach((s,j)=>{if(hit(s,c.x,c.y))un(r.id,R0+j)})});
+vias.forEach(v=>m1.forEach((s,j)=>{if(hit(s,v.x,v.y))un(m20+v.j,R0+j)}));
+const trs=[],rows={p:Rp,n:Rn};
+poly.forEach(pc=>['p','n'].forEach(w=>{if(!rows[w].segs.some(s=>s[0]<=pc.x-GW&&pc.x+GW<=s[1]))return;
+const sr=regs.find(r=>r.row==w&&Math.abs(r.x2-(pc.x-GW))<.5),dr=regs.find(r=>r.row==w&&Math.abs(r.x1-(pc.x+GW))<.5);if(sr&&dr)trs.push({type:w,tid:pc.tid,g:pc.lab,sr,dr,x:pc.x})}));
+const pcomp=nm=>{const p={VDD:[LM+6,rv],GND:[LM+6,rg],OUT:[RX,oY]}[nm],j=m1.findIndex(s=>hit(s,p[0],p[1]));return j<0?-1:fd(R0+j)};
+const PC={VDD:pcomp('VDD'),GND:pcomp('GND'),OUT:pcomp('OUT')};
+const nameOf={};regs.forEach(r=>(nameOf[fd(r.id)]=nameOf[fd(r.id)]||new Set()).add(r.net));
+/* ---- validation ---- */
+const ck=[],add=(t,ok,m)=>ck.push({t,ok,m}),find=t=>trs.find(q=>q.type==t.type&&q.tid==t.id);let bad=[];
+const s0=simT(sch,'VDD','GND','OUT',fn);add(`Schematic: pull-up is the dual of pull-down and implements ${S.out}`,s0.ok,s0.msg);
+sch.forEach(t=>{const x=find(t);if(!x)bad.push(`${t.type}MOS ${t.g} missing from layout`);else if(x.g!=t.g)bad.push(`${t.type}MOS gate ${x.g} should be ${t.g}`)});
+if(trs.length!=sch.length)bad.push(`${trs.length} transistors drawn, ${sch.length} in schematic`);
+add('Every transistor has the correct gate input',!bad.length,bad.join('; ')||`${sch.length} transistors, gates match the schematic`);bad=[];
+sch.forEach(t=>{const x=find(t);if(!x)return;const e=[t.s,t.d].sort().join('/'),d=[x.sr.net,x.dr.net].sort().join('/');if(e!=d)bad.push(`${t.type}MOS ${t.g}: drawn ${d}, schematic ${e}`)});
+add('Source/drain connectivity matches the schematic',!bad.length,bad.join('; ')||'every transistor terminal is on the schematic net');bad=[];
+Object.values(nameOf).forEach(s=>{if(s.size>1)bad.push(`short: ${[...s].join(' and ')} are one net`)});
+const by={};Object.entries(nameOf).forEach(([c,s])=>s.forEach(n=>(by[n]=by[n]||[]).push(c)));
+Object.entries(by).forEach(([n,q])=>{if(q.length>1)bad.push(`missing connection: ${n} is in ${q.length} pieces`)});
+add('No accidental shorts, no missing connections',!bad.length,bad.join('; ')||'each net is exactly one connected piece');bad=[];
+['VDD','GND','OUT'].forEach(nm=>{const s=nameOf[PC[nm]];if(!s||s.size!=1||!s.has(nm))bad.push(`${nm} is not connected to the correct net`)});
+add('VDD, GND and output connections are correct',!bad.length,bad.join('; ')||'rails and output reach the right diffusion');bad=[];
+['p','n'].forEach(w=>{const q=trs.filter(t=>t.type==w).sort((p,r)=>p.x-r.x);for(let i=1;i<q.length;i++)if(q[i-1].dr.net==q[i].sr.net&&q[i-1].dr!==q[i].sr)bad.push(`${w}-diff split between ${q[i-1].g} and ${q[i].g}`)});
+trs.forEach(t=>{if(t.sr===t.dr)bad.push(`gate ${t.g} does not separate source and drain`)});
+add('Shared diffusion is continuous; gates separate source and drain',!bad.length,bad.join('; ')||'neighbouring terminals on one net share one strip');bad=[];
+cts.forEach(c=>{const r=regs[c.rid];if(!r)bad.push(`contact at ${c.x} touches no diffusion`)});
+regs.forEach(r=>{if(r.ct&&/^[pn]\d/.test(r.net)&&regs.filter(q=>q.row==r.row&&q.net==r.net).length<2)bad.push(`unneeded contact on ${r.net}`)});
+add('Contacts only where metal meets diffusion',!bad.length,bad.join('; ')||`${cts.length} contacts, none inside continuous diffusion`);
+const ex=trs.map(t=>({type:t.type,g:t.g,s:fd(t.sr.id),d:fd(t.dr.id)})),s1=simT(ex,PC.VDD,PC.GND,PC.OUT,fn);
+add(`Layout netlist implements ${S.out} (switch-level check)`,s1.ok,s1.msg);
+const V={ok:ck.every(c=>c.ok),ck};
+/* ---- hover info ---- */
+const nid=i=>'c'+fd(i),gm={},info={};
+const G=c=>gm[c]=gm[c]||{r:0,m:0,ct:0,t:new Set()};
+regs.forEach(r=>G(nid(r.id)).r++);m1.forEach((s,j)=>G(nid(R0+j)).m++);m2.forEach((s,j)=>G(nid(m20+j)).m++);
+cts.forEach(c=>{if(c.rid!=null)G(nid(c.rid)).ct++});trs.forEach(t=>[t.sr,t.dr].forEach(r=>G(nid(r.id)).t.add(t.type+'MOS '+t.g)));
+Object.entries(gm).forEach(([c,v])=>{const nm=[...(nameOf[+c.slice(1)]||['?'])].join(' = ');
+info[c]=`Net ${nm}: ${v.r} diffusion region${v.r==1?'':'s'}${v.t.size?' touching '+[...v.t].join(', '):''}; ${v.ct} contact${v.ct==1?'':'s'}; ${v.m} metal piece${v.m==1?'':'s'}.`+(v.m==0&&v.t.size>1?' Connected only by continuous diffusion, so no metal or contact is needed.':'')});
+poly.forEach(p=>{const n=poly.filter(q=>q.lab==p.lab).length;info['in:'+p.lab]=`Input ${p.lab}: ${n} poly gate${n==1?'':'s'} (one pMOS and one nMOS each). All poly columns labelled ${p.lab} are driven by the same input.`});
+/* ---- drawing ---- */
+const di=INFO.length;INFO.push(info);
+let sg='',dif='',pol='',met='',m2s='',vs='',ctS='',lb='';
+regs.forEach(r=>{dif+=`<rect class="rg" data-net="${nid(r.id)}" x="${r.x1}" y="${r.y-8}" width="${r.x2-r.x1}" height="16" fill="${r.row=='p'?PF:NF}"/>`;
+if(!r.ct&&/^[pn]\d/.test(r.net))dif+=`<text x="${(r.x1+r.x2)/2}" y="${r.y+3.5}" text-anchor="middle" style="stroke:none;font-size:10px;font-style:italic;${FF}">${r.net}</text>`});
+[['p',Rp,pY],['n',Rn,nY]].forEach(([w,R,y])=>{R.segs.forEach(([p,q])=>sg+=`<rect x="${p}" y="${y-8}" width="${q-p}" height="16" fill="${w=='p'?PF:NF}" pointer-events="none"/>`);
+R.brks.forEach(mx=>{dif+=`<line x1="${mx}" y1="${y-14}" x2="${mx}" y2="${y+14}" stroke="#888" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${mx}" y="${w=='p'?y-20:y+34}" text-anchor="middle" style="stroke:none;font-size:10px;font-style:italic;fill:#777;${FF}">break</text>`})});
+if(opt.sd)[['p',Rp,pY,cp.ori],['n',Rn,nY,cn.ori]].forEach(([w,R,y,ori])=>ori.forEach((q,k)=>{const sa=w=='p'?'S':'D',sb=w=='p'?'D':'S',l=q?[sb,sa]:[sa,sb],ly=w=='p'?y-13:y+26;
+lb+=`<text x="${X(k)-14}" y="${ly}" text-anchor="end" style="font-weight:700;font-size:12px;fill:#555">${l[0]}</text><text x="${X(k)+14}" y="${ly}" style="font-weight:700;font-size:12px;fill:#555">${l[1]}</text>`}));
+poly.forEach(p=>{pol+=`<rect data-net="in:${p.lab}" x="${p.x-2.5}" y="${p.y1}" width="5" height="${p.y2-p.y1}" fill="${RD}"/>`;
+lb+=`<text data-net="in:${p.lab}" x="${p.x}" y="${p.y1-12}" text-anchor="middle" style="${FF}font-size:20px;font-weight:700;fill:${RD}">${p.lab}</text>`});
+m1.forEach((q,j)=>{const id=nid(R0+j);met+=q.rail?`<rect data-net="${id}" x="${q.x1}" y="${q.y1-2}" width="${q.x2-q.x1}" height="4" fill="${MB}"/>`:`<line data-net="${id}" x1="${q.x1}" y1="${q.y1}" x2="${q.x2}" y2="${q.y2}" stroke="${MB}" stroke-width="3.5"/>`});
+m2.forEach((q,j)=>m2s+=`<line data-net="${nid(m20+j)}" x1="${q.x1}" y1="${q.y1}" x2="${q.x2}" y2="${q.y2}" stroke="${PU}" stroke-width="3.5"/>`);
+vias.forEach(v=>vs+=`<rect data-net="${nid(m20+v.j)}" x="${v.x-6}" y="${v.y-6}" width="12" height="12" fill="#fff" stroke="${PU}" stroke-width="3"/>`);
+cts.forEach(c=>{ctS+=`<g data-net="${nid(c.rid)}"><circle cx="${c.x}" cy="${c.y}" r="9" fill="#fff" fill-opacity="0"/><path d="M${c.x-7} ${c.y-7}L${c.x+7} ${c.y+7}M${c.x+7} ${c.y-7}L${c.x-7} ${c.y+7}" stroke="#111" stroke-width="3.5"/></g>`});
+tks.forEach(t=>{const pr=t.nm[0]=='p';lb+=`<text x="${t.lo+14}" y="${t.y+(pr?-12:28)}" style="${FF}font-size:15px;font-weight:700;fill:${t.j?PU:MB};stroke:#fff;stroke-width:4px;paint-order:stroke">${t.nm}${t.j?' (metal 2)':''}</text>`});
+lb+=`<text x="${LM-12}" y="${rv+6}" text-anchor="end" style="${FF}font-size:17px;font-weight:700;fill:${MB}">VDD</text><text x="${LM-12}" y="${rg+6}" text-anchor="end" style="${FF}font-size:17px;font-weight:700;fill:${MB}">GND</text>`;
+lb+=`<circle data-net="${nid(R0+2+cts.length)}" cx="${RX}" cy="${oY}" r="7" fill="#fff" stroke="${MB}" stroke-width="3"/><text x="${RX+16}" y="${oY+7}" style="${FF}font-size:21px;font-weight:700;fill:${MB}">${S.out}</text>`;
+const side=(y,p,q,c)=>`<text x="${LM-12}" y="${y-3}" text-anchor="end" style="${FF}font-size:14px;fill:${c}">${p}</text><text x="${LM-12}" y="${y+14}" text-anchor="end" style="${FF}font-size:14px;fill:${c}">${q}</text>`;
+const ly=rg+52,it=[['Metal',`<rect x="0" y="-5" width="22" height="10" fill="${MB}"/>`],['Poly',`<rect x="0" y="-2.5" width="22" height="5" fill="${RD}"/>`],['n-diff',`<rect x="0" y="-6" width="22" height="12" fill="${NF}"/>`],['p-diff',`<rect x="0" y="-6" width="22" height="12" fill="${PF}"/>`],['Contact',`<path d="M4 -7L18 7M18 -7L4 7" stroke="#111" stroke-width="3"/>`],['Diffusion break',`<line x1="11" y1="-9" x2="11" y2="9" stroke="#888" stroke-width="1.5" stroke-dasharray="3 3"/>`]];
+if(m2.length)it.push(['Metal-2 jumper',`<rect x="0" y="-3" width="22" height="6" fill="${PU}"/>`],['Via',`<rect x="4" y="-7" width="14" height="14" fill="#fff" stroke="${PU}" stroke-width="3"/>`]);
 const lg=it.map(([t,s],k)=>`<g transform="translate(${24+(k%4)*(W-40)/4},${ly+Math.floor(k/4)*28})">${s}<text x="30" y="4" style="font-size:12px">${t}</text></g>`).join('');
-const tstr=g.t=='lit'?L(g)+"'":'('+str(g).replace(/·/g,'')+")'";
-const title=`${S.out} = ${tstr} – gate order ${names.join(' ')}`;
-return`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto"><text x="${W/2}" y="28" text-anchor="middle" style="${FF}font-size:18px;font-weight:700">${title}</text>${rail(rv,'VDD')}${rail(rg,'GND')}${d}${po}${me}${co}${ju}${lb}${side(pY,'p-diff','(pMOS)','#b8860b')}${side(nY,'n-diff','(nMOS)','#1f8a4c')}${lg}</svg>`}
+const names=o.map(i=>L(bn[i].n)),tstr=g.t=='lit'?L(g)+"'":'('+str(g).replace(/·/g,'')+")'",nb=Rp.brks.length+Rn.brks.length;
+const svg=`<svg class="stk" data-d="${di}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto"><style>.stk text{fill:#111}</style><defs><pattern id="h${di}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="${RD}" stroke-width="2.2"/></pattern></defs><rect width="100%" height="100%" fill="#fff"/><text x="${W/2}" y="26" text-anchor="middle" style="${FF}font-size:18px;font-weight:700">${S.out} = ${tstr} – gate order ${names.join(' ')}</text><text x="${W/2}" y="44" text-anchor="middle" style="${FF}font-size:12px;fill:#666">diffusion breaks: pMOS ${Rp.brks.length}, nMOS ${Rn.brks.length}</text>${sg}${dif}${pol}${met}${m2s}${vs}${ctS}${lb}${side(pY,'p-diff','(pMOS)','#b8860b')}${side(nY,'n-diff','(nMOS)','#1f8a4c')}${lg}</svg>`;
+const np=ck.filter(c=>c.ok).length;
+const vh=`<details class="val ${V.ok?'ok':'bad'}"${V.ok?'':' open'}><summary>${V.ok?'✓ Verified against the schematic':'✗ Verification FAILED'} – ${np}/${ck.length} checks passed</summary><ul>${ck.map(c=>`<li class="${c.ok?'ok':'bad'}">${c.ok?'✓':'✗'} <b>${c.t}</b> – ${c.m}</li>`).join('')}</ul></details>`;
+return{html:svg+`<div class="netinfo">Hover or tap a diffusion region, metal line or contact to highlight its net.</div>`+vh,ok:V.ok,ck,breaks:nb,nT:N,o}}
+const pick=(()=>{let f=null;for(let i=0;i<Math.min(cands.length,60);i++){const r=build(cands[i]);f=f||r;if(r.ok)return r}return f})();
+if(EU)pick.eu=euHtml(EU,pick);
+return pick
+function euHtml(E,pk){const fmt=(G,T,nm,note)=>{const vs=[...new Set(G.flatMap(e=>[e.u,e.v]))],dg={};G.forEach(e=>{dg[e.u]=(dg[e.u]||0)+1;dg[e.v]=(dg[e.v]||0)+1});
+const sset=new Set([vs[0]]);let c=1;while(c){c=0;G.forEach(e=>{if(sset.has(e.u)!==sset.has(e.v)){sset.add(e.u);sset.add(e.v);c=1}})}
+const cn=sset.size==vs.length,od=vs.filter(v=>dg[v]%2),kind=!cn?'not connected: no Euler path':od.length==0?'all degrees even: Euler circuit':od.length==2?`odd vertices ${od.join(', ')}: open Euler trail`:'more than 2 odd vertices: no Euler path';
+const ex=T[0]?T[0][0].from+T[0].map(x=>` –${x.lab}→ ${x.to}`).join(''):'none';
+return `<p><b>${nm} graph</b> (each transistor is an edge, each diffusion node a vertex)<br>Edges: ${G.map(e=>`${e.lab}: ${e.u}–${e.v}`).join(', ')}<br>Vertex degrees: ${vs.map(v=>v+'='+dg[v]).join(', ')} · connected: ${cn?'yes':'no'} · ${kind}</p><p><b>${note} Euler path</b>: ${ex}${T.length>1?` (${T.length>=20000?'20000+':T.length} valid paths found)`:''}</p>`};
+const sel=pk.o.map(i=>L(bn[i].n)).join('-'),cm=E.common;
+return `<div class="eu"><div class="cap">Euler Path Analysis</div>${fmt(E.En,E.tn,'NMOS','NMOS')}${fmt(E.Ep,E.tp,'PMOS','PMOS')}<p><b>Common Euler path</b>: ${cm.length?`${cm.length} common gate sequence${cm.length>1?'s':''} found (e.g. ${cm.slice(0,4).map(q=>q.map(i=>L(bn[i].n)).join('-')).join(', ')}${cm.length>4?', …':''}).`:'none exists for this circuit.'}</p><p><b>Selected gate ordering</b>: <span style="color:#b91c1c;font-weight:700">${sel}</span><br>${cm.length?`Why: it is a common Euler path, so both diffusion rows run unbroken (${pk.breaks} diffusion breaks). Among all common paths it gave the fewest breaks, then the fewest metal crossings, then the first in label order.`:`No common Euler path, so the circuit is NOT altered. This order was chosen for the fewest diffusion breaks (${pk.breaks}); the breaks are joined with metal and contacts.`}</p></div>`}}
 /*UI*/
 const $=id=>document.getElementById(id);
-function block(txt){const P=parse(txt),S=stages(P);
-const vars=[...new Set((function f(n){return n.t=='lit'?[n.v]:n.t=='not'?f(n.c):n.c.flatMap(f)})(P.tree))].sort();
+const DEF='Hover or tap a diffusion region, metal line or contact to highlight its net.';
+/* the staged circuit (input inverters, gate, output inverter) must equal the typed equation */
+function chainOk(P,S,vars){for(let m=0;m<1<<vars.length;m++){const e={};vars.forEach((v,i)=>e[v]=!!(m>>i&1));const sv={...e};let last;
+S.forEach(x=>{last=!evg(x.g,sv);sv[x.out]=last});if(last!==ev(P.tree,e))return false}return true}
+function varsOf(P){return[...new Set((function f(n){return n.t=='lit'?[n.v]:n.t=='not'?f(n.c):n.c.flatMap(f)})(P.tree))].sort()}
+function block(txt,opt){const P=parse(txt),S=stages(P),vars=varsOf(P);
 if(vars.length>8)throw Error('Use at most 8 variables');
 let tr=0;S.forEach(x=>tr+=2*leaves(x.g));
-let h=`<h2>${P.lhs} = ${str(nnf(P.tree,false)).replace(/^/,'')}</h2><div class="card">${P.lhs} needs <b>${tr}</b> transistors (${tr/2} PMOS + ${tr/2} NMOS). Inputs: ${vars.join(', ')}.</div>`;
-S.forEach(x=>{h+=`<div class="card"><div class="st">${x.title}</div><div class="fn">Pull-down (NMOS): ${str(x.g)} &nbsp;|&nbsp; Pull-up (PMOS): ${str(dual(x.g))}</div>
-<div class="cap">CMOS circuit</div><div class="sc">${schem(x)}</div><div class="cap">Stick diagram — S/D mark source and drain beside each gate</div><div class="sc">${stick(x)}</div></div>`});
+const R=S.map(x=>stick(x,opt)),okAll=R.every(r=>r.ok)&&chainOk(P,S,vars);
+let h=`<h2>${P.lhs} = ${str(nnf(P.tree,false))}</h2><div class="card">${P.lhs} needs <b>${tr}</b> transistors (${tr/2} PMOS + ${tr/2} NMOS). Inputs: ${vars.join(', ')}.<br><span style="color:${okAll?'#15803d':'#c0392b'};font-weight:600">${okAll?'✓ Schematic and stick diagram verified: topology, connectivity and truth table all agree.':'✗ Verification failed – see the details under each stick diagram.'}</span></div>`;
+S.forEach((x,i)=>{h+=`<div class="card"><div class="st">${x.title}</div><div class="fn">Pull-down (NMOS): ${str(x.g)} &nbsp;|&nbsp; Pull-up (PMOS): ${str(dual(x.g))}</div>
+<div class="cap">CMOS circuit</div><div class="sc">${schem(x)}</div>${R[i].eu||''}<div class="cap">Stick diagram</div><div class="sc">${R[i].html}</div></div>`});
 let t='<table><tr>'+vars.map(v=>`<th>${v}</th>`).join('')+`<th>${P.lhs}</th></tr>`;
 for(let m=0;m<(1<<vars.length);m++){const e={};vars.forEach((v,i)=>e[v]=!!((m>>(vars.length-1-i))&1));t+='<tr>'+vars.map(v=>`<td>${+e[v]}</td>`).join('')+`<td><b>${+ev(P.tree,e)}</b></td></tr>`}
 return h+`<div class="card"><div class="st">Truth table</div><div class="sc">${t}</table></div></div>`}
-function go(){const e=$('err');e.textContent='';let h='';
-try{split($('eq').value).forEach(q=>h+=block(q))}catch(x){e.textContent=x.message;$('out').innerHTML='';return}
+const TESTS=[['Z = ¬(AB+CD)','\\(Z=\\overline{AB+CD}\\)'],['Z = ¬((A+B+C)(D+E))','\\(Z=\\overline{(A+B+C)(D+E)}\\)'],['Z = ¬(A(D+E)+BC)','\\(Z=\\overline{A(D+E)+BC}\\)'],['F = A(B+C)','\\(F=A(B+C)\\)']];
+function runTests(){return TESTS.map(([n,t])=>{try{INFO.length=0;const P=parse(split(t)[0]),S=stages(P),r=S.map(x=>stick(x,{})),c=chainOk(P,S,varsOf(P));
+return{n,ok:c&&r.every(q=>q.ok),chain:c,st:S.map((x,i)=>({t:x.title,ok:r[i].ok,br:r[i].breaks,nT:r[i].nT,np:r[i].ck.filter(q=>q.ok).length,nc:r[i].ck.length}))}}catch(e){return{n,ok:false,err:e.message,st:[]}}})}
+function showTests(){const R=runTests();$('st').innerHTML='<div class="card"><div class="st">Self-test</div><div class="sc"><table><tr><th>Expression</th><th>Stage</th><th>Checks</th><th>Diffusion breaks</th><th>Result</th></tr>'+
+R.flatMap(r=>r.err?[`<tr><td>${r.n}</td><td colspan="3">${r.err}</td><td>✗</td></tr>`]:r.st.map((s,i)=>`<tr><td>${i?'':r.n}</td><td style="text-align:left">${s.t}</td><td>${s.np}/${s.nc}</td><td>${s.br}</td><td>${s.ok?'✓':'✗'}</td></tr>`).concat([`<tr><td colspan="4" style="text-align:right">whole circuit equals the equation</td><td>${r.chain?'✓':'✗'}</td></tr>`])).join('')+'</table></div></div>';
+INFO.length=0;go()}
+function go(){const e=$('err');e.textContent='';let h='';INFO.length=0;const opt={sd:$('sd').checked,euler:$('eu').checked};
+try{split($('eq').value).forEach(q=>h+=block(q,opt))}catch(x){e.textContent=x.message;$('out').innerHTML='';return}
 $('out').innerHTML=h;
 document.querySelectorAll('#out .sc').forEach((d,i)=>{const v=d.querySelector('svg');if(!v)return;const b=document.createElement('button');b.className='dlb';b.textContent='Download SVG';
-b.onclick=()=>{let s=v.outerHTML.replace(/var\(--fg\)/g,'#111').replace(/var\(--card\)/g,'#fff').replace(/var\(--mut\)/g,'#666');
+b.onclick=()=>{let s=v.outerHTML.replace(/var\(--fg\)/g,'#111').replace(/var\(--card\)/g,'#fff').replace(/var\(--mut\)/g,'#666').replace(/ class="hl"/g,'').replace(/ hlon/g,'');
 s=s.replace(/>/,'><style>text{font:13px monospace}</style><rect width="100%" height="100%" fill="#fff"/>');s=s.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg"');
 const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}));a.download='cmos-diagram-'+(i+1)+'.svg';a.click()};d.appendChild(b)})}
+/* connection inspection: hover to preview a net, click to pin it */
+function hl(svg,id){svg.querySelectorAll('[data-net]').forEach(e=>e.classList.toggle('hl',!!id&&e.getAttribute('data-net')===id));svg.classList.toggle('hlon',!!id);
+const b=svg.parentNode.querySelector('.netinfo');if(b)b.textContent=id?(INFO[+svg.getAttribute('data-d')]||{})[id]||'':DEF}
 if(typeof document!=='undefined'){
-[['Q7: Z = ¬(AB+CD)','\\(Z=\\overline{AB+CD}\\)'],['Q9: Z = ¬((A+B+C)(D+E))','\\(Z=\\overline{(A+B+C)(D+E)}\\)'],['PYQ Q1(a): F = A(B+C)','\\(F=A(B+C)\\)'],['Example: Y = ¬((A+B)C)','\\(Y=\\overline{(A+B)C}\\)']].forEach(([t,v])=>{
-const b=document.createElement('button');b.textContent=t;b.onclick=()=>{$('eq').value=v;go()};$('pre').appendChild(b)});
-$('draw').onclick=go;$('clr').onclick=()=>{$('eq').value='';$('out').innerHTML=''};$('eq').addEventListener('input',go);go()}
+[['Q7: Z = ¬(AB+CD)','\\(Z=\\overline{AB+CD}\\)',1],['Q8(a): Z = ¬(A(D+E)+BC)','\\(Z=\\overline{A(D+E)+BC}\\)',1],['Q8(b)/Q9: Z = ¬((A+B+C)(D+E))','\\(Z=\\overline{(A+B+C)(D+E)}\\)',1],['Q8(c): Z = A′B′+CD','Z=!((A+B)(C\'+D\'))',1],['NAND / simple: Z = ¬(AB)','Z=!(AB)',0],['NOR: Z = ¬(A+B)','Z=!(A+B)',0],['F = A(B+C)','\\(F=A(B+C)\\)',0]].forEach(([t,v,eu])=>{
+const b=document.createElement('button');b.textContent=t;b.onclick=()=>{$('eq').value=v;$('eu').checked=!!eu;go()};$('pre').appendChild(b)});
+const O=$('out'),nt=e=>{const t=e.target.closest&&e.target.closest('[data-net]');return t&&t.ownerSVGElement&&t.ownerSVGElement.classList.contains('stk')?t:null};
+O.addEventListener('mouseover',e=>{const t=nt(e);if(!t)return;const s=t.ownerSVGElement;if(!s.pin)hl(s,t.getAttribute('data-net'))});
+O.addEventListener('mouseout',e=>{const t=nt(e);if(!t)return;const s=t.ownerSVGElement;if(!s.pin)hl(s,null)});
+O.addEventListener('click',e=>{const t=nt(e),s=(e.target.closest&&e.target.closest('svg.stk'));if(!s)return;
+const id=t?t.getAttribute('data-net'):null;s.pin=(id&&s.pin!==id)?id:null;hl(s,s.pin)});
+$('draw').onclick=go;$('clr').onclick=()=>{$('eq').value='';$('out').innerHTML=''};$('eq').addEventListener('input',go);$('sd').onchange=go;$('eu').onchange=go;$('tst').onclick=showTests;go()}
 </script></body></html>
