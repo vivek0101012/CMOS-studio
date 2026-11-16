@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CMOS Studio – equation to circuit and stick diagram</title>
+<meta name="description" content="Type a Boolean equation, get the CMOS circuit, stick diagram and truth table. Runs entirely in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233b2f22'/%3E%3Ctext x='16' y='22' font-size='16' text-anchor='middle' fill='%23f6f3ec' font-family='monospace' font-weight='700'%3EC%3C/text%3E%3C/svg%3E">
+<style>
+:root{--bg:#f6f3ec;--card:#fffdf8;--fg:#1c1b19;--mut:#76716a;--line:#e3ddd0;--acc:#8a5a2b;--acc2:#3b2f22;--sh:0 1px 2px rgba(60,40,10,.06),0 8px 24px rgba(60,40,10,.06);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#14130f;--card:#1d1b16;--fg:#efeae0;--mut:#9d968a;--line:#322e25;--acc:#d9a566;--acc2:#efeae0;--sh:0 1px 2px #0006;color-scheme:dark}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+header.top{border-bottom:1px solid var(--line);background:var(--card)}
+.wrap{max-width:1040px;margin:auto;padding:0 20px}
+.nav{display:flex;align-items:center;gap:10px;height:58px;font-family:Georgia,"Times New Roman",serif;font-size:19px;letter-spacing:.2px}
+.logo{width:26px;height:26px;border-radius:7px;background:var(--acc2);color:var(--bg);display:grid;place-items:center;font:700 13px ui-monospace,monospace}
+.nav small{margin-left:auto;color:var(--mut);font:12px ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+.hero{padding:44px 0 22px}
+h1{font:400 clamp(30px,5vw,46px)/1.1 Georgia,"Times New Roman",serif;margin:0 0 12px;letter-spacing:-.5px}
+h1 em{color:var(--acc)}.hero p{color:var(--mut);max-width:620px;margin:0;font-size:16px}
+h2{font:400 22px Georgia,serif;margin:34px 0 12px;padding-top:18px;border-top:1px solid var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:var(--sh)}
+#eq{width:100%;font:17px ui-monospace,Menlo,Consolas,monospace;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);resize:vertical;outline:none}
+#eq:focus{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 20%,transparent)}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:6px 14px;cursor:pointer;transition:.15s}
+button:hover{border-color:var(--acc);color:var(--acc)}button.go{background:var(--acc2);color:var(--bg);border-color:var(--acc2)}button.go:hover{opacity:.88;color:var(--bg)}
+.dlb{margin-top:8px;font-size:12px;padding:4px 12px}
+.lbl{font-size:11px;color:var(--mut);margin-top:16px;letter-spacing:.09em;text-transform:uppercase}
+.help{font-size:13px;color:var(--mut);margin-top:14px;line-height:1.7}code{font:12px ui-monospace,monospace;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+#err{color:#c0392b;min-height:22px;margin-top:8px;font-size:14px}
+.sc{overflow-x:auto;text-align:center;padding:8px 0}svg text{font:13px ui-monospace,Menlo,monospace;fill:var(--fg)}
+.st{font:400 18px Georgia,serif;margin:0 0 4px}.fn{color:var(--mut);font-size:13px;margin-bottom:6px;font-family:ui-monospace,Menlo,monospace}
+.cap{font-size:11px;color:var(--mut);margin:14px 0 2px;letter-spacing:.09em;text-transform:uppercase;border-top:1px dashed var(--line);padding-top:12px}
+table{border-collapse:collapse;font:13px ui-monospace,Menlo,monospace;margin:auto}td,th{border:1px solid var(--line);padding:4px 12px;text-align:center}th{background:var(--bg)}
+footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 30px;color:var(--mut);font-size:13px;text-align:center}
+@media print{header.top,#inp,footer,.dlb{display:none}body{background:#fff}.card{box-shadow:none;break-inside:avoid}}
+</style></head><body>
+<header class="top"><div class="wrap nav"><span class="logo">C</span>CMOS Studio<small>Runs in your browser</small></div></header>
+<main class="wrap">
+<section class="hero"><h1>From Boolean equation to <em>CMOS circuit</em> and stick diagram.</h1>
+<p>Paste an equation or a whole question. Get the pull-up and pull-down networks with source and drain marked, the stick diagram, and a truth table.</p></section>
+<div class="card" id="inp">
+<textarea id="eq" rows="2" spellcheck="false" aria-label="Equation">\(Z=\overline{AB+CD}\)</textarea>
+<div class="row"><button class="go" id="draw">Draw</button><button id="clr">Clear</button><button onclick="window.print()">Print / save PDF</button></div>
+<div class="lbl">Presets</div><div class="row" id="pre"></div>
+<div class="help">Accepts LaTeX copied from a question (<code>\( Z=\overline{AB+CD} \)</code>, <code>\cdot</code>, <code>\oplus</code>) or plain text (<code>Z=!(AB+CD)</code>). <b>+</b> is OR, letters together or <b>*</b> is AND, <b>'</b> or <b>!</b> is NOT. Several <code>\( … \)</code> equations in one paste are each drawn.</div>
+<div id="err"></div></div>
+<div id="out"></div>
+</main>
+<footer><div class="wrap">CMOS Studio · static page, no server, no data leaves your browser</div></footer>
+<script>
+/*CORE*/
+const CW=84,CH=64,PD=.25;
+const L=n=>n.v+(n.neg?"'":"");
+function split(t){const re=/\\\(([\s\S]*?)\\\)|\$\$?([\s\S]*?)\$\$?|\\\[([\s\S]*?)\\\]/g;let m;const r=[];while(m=re.exec(t))r.push(m[1]||m[2]||m[3]);return r.length?r:[t]}
+function latex(s){return s.replace(/\\(left|right|displaystyle|quad|qquad|,|;|!)/g,'').replace(/\\ /g,'').replace(/\\(cdot|times|land|wedge)/g,'*').replace(/\\(lor|vee)/g,'+').replace(/\\oplus|⊕/g,'^').replace(/\\(neg|lnot)\s*/g,'!').replace(/\\(overline|bar|not)\s*([A-Za-z])/g,"$2'").replace(/\\(overline|bar|not)\s*\{/g,'!{').replace(/\{/g,'(').replace(/\}/g,')').trim().replace(/[.,;]+$/,'')}
+function parse(s){s=latex(s);let lhs='Z';if(s.includes('=')){const p=s.split('=');lhs=p[0].trim()||'Z';s=p.slice(1).join('=')}
+s=s.replace(/\s+/g,'').replace(/[·.•&∙×]/g,'*').replace(/[|∨]/g,'+').replace(/¬/g,'!').replace(/[’‘]/g,"'");
+if(!s)throw Error('Empty equation');let i=0;const pk=()=>s[i];
+function O(){const c=[T()];while(pk()=='+'){i++;c.push(T())}return c.length>1?{t:'or',c}:c[0]}
+function E(){let a=O();while(pk()=='^'){i++;const b=O();a={t:'or',c:[{t:'and',c:[a,{t:'not',c:b}]},{t:'and',c:[{t:'not',c:a},b]}]}}return a}
+function T(){const c=[F()];while(pk()=='*'||(pk()&&/[A-Za-z(!~]/.test(pk()))){if(pk()=='*')i++;c.push(F())}return c.length>1?{t:'and',c}:c[0]}
+function F(){if(pk()=='!'||pk()=='~'){i++;return{t:'not',c:F()}}let a=A();while(pk()=="'"){i++;a={t:'not',c:a}}return a}
+function A(){const ch=pk();if(ch=='('){i++;const e=E();if(pk()!=')')throw Error('Missing )');i++;return e}
+if(ch&&/[A-Za-z]/.test(ch)){i++;return{t:'lit',v:ch.toUpperCase()}}throw Error(ch?`Unexpected “${ch}”`:'Equation ends too early')}
+const r=E();if(i<s.length)throw Error(`Unexpected “${s[i]}”`);return{lhs,tree:r}}
+function nnf(n,ng){if(n.t=='lit')return{t:'lit',v:n.v,neg:ng};if(n.t=='not')return nnf(n.c,!ng);
+const t=ng?(n.t=='and'?'or':'and'):n.t,c=[];n.c.forEach(x=>{const y=nnf(x,ng);y.t==t?c.push(...y.c):c.push(y)});return{t,c}}
+let uid=0;const lab=n=>{if(n.t=='lit')n.id=uid++;else n.c.forEach(lab)};
+const dual=n=>n.t=='lit'?n:{t:n.t=='and'?'or':'and',c:n.c.map(dual)};
+const str=n=>n.t=='lit'?L(n):n.t=='or'?n.c.map(str).join(' + '):n.c.map(c=>c.t=='or'?'('+str(c)+')':str(c)).join('·');
+const leaves=n=>n.t=='lit'?1:n.c.reduce((a,c)=>a+leaves(c),0);
+const ev=(n,e)=>n.t=='lit'?e[n.v]:n.t=='not'?!ev(n.c,e):n.t=='and'?n.c.every(c=>ev(c,e)):n.c.some(c=>ev(c,e));
+function stages(P){let n=P.tree,neg=false;while(n.t=='not'){neg=!neg;n=n.c}
+const g=nnf(n,false);uid=0;lab(g);const S=[],cp=new Set();
+(function w(x){x.t=='lit'?x.neg&&cp.add(x.v):x.c.forEach(w)})(g);
+[...cp].sort().forEach(v=>S.push({title:`Input inverter for ${v}`,g:{t:'lit',v,neg:false,id:0},out:v+"'"}));
+S.push({title:neg?'CMOS gate':'CMOS gate (gives the complement Y, an inverter follows)',g,out:neg?P.lhs:'Y'});
+if(!neg)S.push({title:'Output inverter',g:{t:'lit',v:'Y',neg:false,id:0},out:P.lhs});return S}
+/* schematic */
+function sz(n){if(n.t=='lit')return[1,1];const s=n.c.map(sz);
+return n.t=='and'?[Math.max(...s.map(a=>a[0])),s.reduce((a,b)=>a+b[1],0)]:[s.reduce((a,b)=>a+b[0],0),Math.max(...s.map(a=>a[1]))+PD*2]}
+function dr(n,x0,y0,p,sd){const[w,h]=sz(n),ax=x0+w*CW/2;let s='';
+if(n.t=='lit'){const m=y0+32,q=sd?-1:1,cx=ax+q*10,px=ax+q*4,an=q>0?'start':'end';
+s+=`<path d="M${ax} ${y0}V${y0+20}H${cx}M${cx} ${y0+44}H${ax}V${y0+CH}M${cx} ${y0+20}V${y0+27}M${cx} ${y0+30}V${y0+34}M${cx} ${y0+37}V${y0+44}M${px} ${y0+20}V${y0+44}"/>`;
+s+=p?`<path d="M${ax-q*27} ${m}H${ax-q*3.5}"/><circle cx="${ax}" cy="${m}" r="3.5" fill="var(--card)"/>`:`<path d="M${ax-q*27} ${m}H${px}"/>`;
+s+=`<text x="${ax-q*31}" y="${m+4}" text-anchor="${q>0?'end':'start'}" style="stroke:none;font-weight:700">${L(n)}</text>`;
+s+=`<text x="${ax+q*14}" y="${y0+15}" text-anchor="${an}" style="stroke:none;font-size:10px;fill:var(--mut)">${p?'S':'D'}</text><text x="${ax+q*14}" y="${y0+58}" text-anchor="${an}" style="stroke:none;font-size:10px;fill:var(--mut)">${p?'D':'S'}</text>`;
+s+=`<circle cx="${cx}" cy="${y0+20}" r="2.5" class="d"/><circle cx="${cx}" cy="${y0+44}" r="2.5" class="d"/>`;return s}
+if(n.t=='and'){let y=y0;n.c.forEach(c=>{const[cw,ch]=sz(c);s+=dr(c,x0+(w-cw)*CW/2,y,p,sd);y+=ch*CH});return s}
+let x=x0;const pad=PD*CH,ax0=[];
+n.c.forEach((c,i)=>{const[cw,ch]=sz(c),a=x+cw*CW/2;ax0.push(a);s+=dr(c,x,y0+pad,p,i>=n.c.length/2?1:0);
+s+=`<path d="M${a} ${y0}V${y0+pad}M${a} ${y0+pad+ch*CH}V${y0+h*CH}"/>`;x+=cw*CW});
+s+=`<path d="M${ax0[0]} ${y0}H${ax0[ax0.length-1]}M${ax0[0]} ${y0+h*CH}H${ax0[ax0.length-1]}"/>`;
+s+=`<circle cx="${ax}" cy="${y0}" r="3" class="d"/><circle cx="${ax}" cy="${y0+h*CH}" r="3" class="d"/>`;return s}
+function schem(S){const g=S.g,u=dual(g),[wn,hn]=sz(g),[wp,hp]=sz(u),W=Math.max(wn,wp)*CW,ax=90+W/2;
+const py=44,y1=py+hp*CH,oy=y1+24,ny=y1+48,y2=ny+hn*CH,H=y2+48,Wt=90+W+130;
+return`<svg width="${Wt}" height="${H}" viewBox="0 0 ${Wt} ${H}" style="max-width:100%;height:auto" fill="none" stroke="var(--fg)" stroke-width="2"><style>.d{fill:var(--fg);stroke:none}</style>
+<circle cx="${ax}" cy="12" r="4"/><text x="${ax+10}" y="16" style="stroke:none">Vdd</text><path d="M${ax} 16V${py}"/>
+${dr(u,ax-wp*CW/2,py,true,0)}<path d="M${ax} ${y1}V${ny}M${ax} ${oy}H${ax+W/2+50}"/><circle cx="${ax}" cy="${oy}" r="3.5" class="d"/>
+<circle cx="${ax+W/2+54}" cy="${oy}" r="4"/><text x="${ax+W/2+64}" y="${oy+5}" style="stroke:none;font-weight:700">${S.out}</text>
+${dr(g,ax-wn*CW/2,ny,false,0)}<path d="M${ax} ${y2}V${y2+10}M${ax-16} ${y2+10}H${ax+16}M${ax-10} ${y2+16}H${ax+10}M${ax-4} ${y2+22}H${ax+4}"/><text x="${ax+24}" y="${y2+22}" style="stroke:none">GND</text></svg>`}
+/* stick */
+function net(n,a,b,Lst,c){if(n.t=='lit'){Lst.push({n,a,b});return}
+if(n.t=='or'){n.c.forEach(x=>net(x,a,b,Lst,c));return}
+let p=a;n.c.forEach((x,i)=>{const q=i==n.c.length-1?b:c.pre+c.k++;net(x,p,q,Lst,c);p=q})}
+const lf=(t,o)=>o?t.b:t.a,rt=(t,o)=>o?t.a:t.b;
+function chain(seq){const n=seq.length,dp=[[0,0]],bp=[[0,0]];
+for(let i=1;i<n;i++){dp[i]=[];bp[i]=[];for(let o=0;o<2;o++){let b=1e9,bo=0;for(let q=0;q<2;q++){const c=dp[i-1][q]+(lf(seq[i],o)==rt(seq[i-1],q)?0:1);if(c<b){b=c;bo=q}}dp[i][o]=b;bp[i][o]=bo}}
+let o=dp[n-1][0]<=dp[n-1][1]?0:1;const cost=dp[n-1][o],ori=[];for(let i=n-1;i>=0;i--){ori[i]=o;o=bp[i][o]}return{cost,ori}}
+function stick(S){const g=S.g,u=dual(g),Ln=[],Lp=[];
+net(g,'OUT','GND',Ln,{k:1,pre:'n'});net(u,'VDD','OUT',Lp,{k:1,pre:'p'});
+const N=Ln.length,bn={},bp={};Ln.forEach(t=>bn[t.n.id]=t);Lp.forEach(t=>bp[t.n.id]=t);
+let ord=[...Array(N).keys()],bc=1e9;
+const tryO=o=>{const c=chain(o.map(i=>bn[i])).cost+chain(o.map(i=>bp[i])).cost;if(c<bc){bc=c;ord=[...o]}};
+if(N<=7){const a=[...Array(N).keys()];(function pm(k){if(bc==0)return;if(k==N){tryO(a);return}for(let i=k;i<N;i++){[a[k],a[i]]=[a[i],a[k]];pm(k+1);[a[k],a[i]]=[a[i],a[k]]}})(0)}else tryO(ord);
+const P=90,M=70,X=k=>M+k*P+P/2,W=M+N*P+150;
+function row(by,pm){const seq=ord.map(i=>by[i]),{ori}=chain(seq),cs=[],seg=[],lb=[];let st=0;
+seq.forEach((t,k)=>{const o=ori[k],l=lf(t,o),r=rt(t,o),sa=pm?'S':'D',sb=pm?'D':'S';lb.push(o?[sb,sa]:[sa,sb]);
+if(k==0){cs.push({net:l,x:X(0)-P/2});st=cs[0].x}
+else{const pr=rt(seq[k-1],ori[k-1]),mx=(X(k-1)+X(k))/2;
+if(pr==l)cs.push({net:l,x:mx});else{cs.push({net:pr,x:mx-16});seg.push([st,mx-16]);cs.push({net:l,x:mx+16});st=mx+16}}
+if(k==N-1){cs.push({net:r,x:X(k)+P/2});seg.push([st,X(k)+P/2])}});return{cs,seg,lb}}
+const Rp=row(bp,1),Rn=row(bn,0);
+const cnt=(R,re)=>{const m={};R.cs.forEach(c=>m[c.net]=(m[c.net]||0)+1);return Object.keys(m).filter(k=>re.test(k)&&m[k]>1)};
+const ip=cnt(Rp,/^p\d/),inn=cnt(Rn,/^n\d/);
+const rv=26,pY=rv+52+14*ip.length,oY=pY+84,nY=oY+84,rg=nY+52+14*inn.length,H=rg+34;
+let s='';const B='#1f4fbf',G='#555',pts={};
+const rd=(R,y,fill,lt,ly)=>{R.seg.forEach(([a,b])=>s+=`<rect x="${a-18}" y="${y-12}" width="${b-a+36}" height="24" rx="4" fill="${fill}" opacity=".85"/>`);
+R.cs.forEach(c=>(pts[c.net]=pts[c.net]||[]).push({x:c.x,y}));
+R.lb.forEach((q,k)=>{s+=`<text x="${X(k)-10}" y="${ly}" text-anchor="end" style="font-weight:700">${q[0]}</text><text x="${X(k)+10}" y="${ly}" style="font-weight:700">${q[1]}</text>`});
+s+=`<text x="${W-44}" y="${y+6}" style="font-size:18px;font-style:italic;font-weight:700;fill:#222">${lt}</text>`};
+rd(Rp,pY,'#c9e24d','p',pY-18);rd(Rn,nY,'#2fa36b','n',nY+30);
+for(let k=0;k<N;k++){const t=bn[ord[k]],x=X(k);s+=`<line x1="${x}" x2="${x}" y1="${pY-22}" y2="${nY+22}" stroke="#e0463c" stroke-width="6" opacity=".92"/><line x1="${x-16}" x2="${x-4}" y1="${oY+40}" y2="${oY+40}" stroke="var(--fg)" stroke-width="2"/><text x="${x-20}" y="${oY+45}" text-anchor="end" style="font-weight:700">${L(t.n)}</text>`}
+const ln=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${G}" stroke-width="7" opacity=".88"/>`;
+s=`<line x1="10" x2="${W-20}" y1="${rv}" y2="${rv}" stroke="${B}" stroke-width="9" stroke-linecap="round"/><text x="${W-70}" y="${rv-10}" style="fill:${B};font-weight:700">Vdd</text><line x1="10" x2="${W-20}" y1="${rg}" y2="${rg}" stroke="${B}" stroke-width="9" stroke-linecap="round"/><text x="${W-70}" y="${rg+24}" style="fill:${B};font-weight:700">Gnd</text>`+s;
+for(const [nm,a] of Object.entries(pts)){let ty;
+if(nm=='VDD'){a.forEach(q=>s+=ln(q.x,q.y,q.x,rv));continue}
+if(nm=='GND'){a.forEach(q=>s+=ln(q.x,q.y,q.x,rg));continue}
+if(nm=='OUT')ty=oY;else if(a.length<2)continue;else if(nm[0]=='p')ty=pY-30-14*ip.indexOf(nm);else ty=nY+34+14*inn.indexOf(nm);
+a.forEach(q=>s+=ln(q.x,q.y,q.x,ty));const xs=a.map(q=>q.x),mx=nm=='OUT'?W-76:Math.max(...xs);s+=ln(Math.min(...xs),ty,mx,ty);
+if(nm=='OUT')s+=`<line x1="${W-76}" x2="${W-66}" y1="${oY}" y2="${oY}" stroke="var(--fg)" stroke-width="2"/><text x="${W-60}" y="${oY+5}" style="font-weight:700">${S.out}</text>`}
+for(const a of Object.values(pts))a.forEach(q=>s+=`<rect x="${q.x-9}" y="${q.y-9}" width="18" height="18" fill="none" stroke="#222" stroke-width="3"/><path d="M${q.x-9} ${q.y-9}L${q.x+9} ${q.y+9}M${q.x+9} ${q.y-9}L${q.x-9} ${q.y+9}" stroke="#222" stroke-width="3"/>`);
+return`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto">${s}</svg>`}
+/*UI*/
+const $=id=>document.getElementById(id);
+function block(txt){const P=parse(txt),S=stages(P);
+const vars=[...new Set((function f(n){return n.t=='lit'?[n.v]:n.t=='not'?f(n.c):n.c.flatMap(f)})(P.tree))].sort();
+if(vars.length>8)throw Error('Use at most 8 variables');
+let tr=0;S.forEach(x=>tr+=2*leaves(x.g));
+let h=`<h2>${P.lhs} = ${str(nnf(P.tree,false)).replace(/^/,'')}</h2><div class="card">${P.lhs} needs <b>${tr}</b> transistors (${tr/2} PMOS + ${tr/2} NMOS). Inputs: ${vars.join(', ')}.</div>`;
+S.forEach(x=>{h+=`<div class="card"><div class="st">${x.title}</div><div class="fn">Pull-down (NMOS): ${str(x.g)} &nbsp;|&nbsp; Pull-up (PMOS): ${str(dual(x.g))}</div>
+<div class="cap">CMOS circuit</div><div class="sc">${schem(x)}</div><div class="cap">Stick diagram — red: poly, yellow-green: p-diffusion, green: n-diffusion, grey: metal, boxed X: contact, S/D: source/drain</div><div class="sc">${stick(x)}</div></div>`});
+let t='<table><tr>'+vars.map(v=>`<th>${v}</th>`).join('')+`<th>${P.lhs}</th></tr>`;
+for(let m=0;m<(1<<vars.length);m++){const e={};vars.forEach((v,i)=>e[v]=!!((m>>(vars.length-1-i))&1));t+='<tr>'+vars.map(v=>`<td>${+e[v]}</td>`).join('')+`<td><b>${+ev(P.tree,e)}</b></td></tr>`}
+return h+`<div class="card"><div class="st">Truth table</div><div class="sc">${t}</table></div></div>`}
+function go(){const e=$('err');e.textContent='';let h='';
+try{split($('eq').value).forEach(q=>h+=block(q))}catch(x){e.textContent=x.message;$('out').innerHTML='';return}
+$('out').innerHTML=h;
+document.querySelectorAll('#out .sc').forEach((d,i)=>{const v=d.querySelector('svg');if(!v)return;const b=document.createElement('button');b.className='dlb';b.textContent='Download SVG';
+b.onclick=()=>{let s=v.outerHTML.replace(/var\(--fg\)/g,'#111').replace(/var\(--card\)/g,'#fff').replace(/var\(--mut\)/g,'#666');
+s=s.replace(/>/,'><style>text{font:13px monospace}</style><rect width="100%" height="100%" fill="#fff"/>');s=s.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg"');
+const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}));a.download='cmos-diagram-'+(i+1)+'.svg';a.click()};d.appendChild(b)})}
+if(typeof document!=='undefined'){
+[['Q7: Z = ¬(AB+CD)','\\(Z=\\overline{AB+CD}\\)'],['Q9: Z = ¬((A+B+C)(D+E))','\\(Z=\\overline{(A+B+C)(D+E)}\\)'],['PYQ Q1(a): F = A(B+C)','\\(F=A(B+C)\\)'],['Example: Y = ¬((A+B)C)','\\(Y=\\overline{(A+B)C}\\)']].forEach(([t,v])=>{
+const b=document.createElement('button');b.textContent=t;b.onclick=()=>{$('eq').value=v;go()};$('pre').appendChild(b)});
+$('draw').onclick=go;$('clr').onclick=()=>{$('eq').value='';$('out').innerHTML=''};$('eq').addEventListener('input',go);go()}
+</script></body></html>
