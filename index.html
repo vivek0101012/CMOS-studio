@@ -45,7 +45,8 @@ details.val ul{margin:8px 0 2px;padding-left:18px}li.bad{color:#c0392b}
 @media print{#st{display:none}details.val{display:none}}
 .eu{text-align:left;font-size:13px;line-height:1.7}.eu p{margin:6px 0}
 @media print{header.top,#inp,footer,.dlb{display:none}body{background:#fff}.card{box-shadow:none;break-inside:avoid}}
-</style></head><body>
+.kx{overflow-x:auto;padding:4px 0}
+</style><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"><script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script></head><body>
 <header class="top"><div class="wrap nav"><span class="logo">C</span>CMOS Studio<small>Runs in your browser</small></div></header>
 <main class="wrap">
 <section class="hero"><h1>From Boolean equation to <em>CMOS circuit</em> and stick diagram.</h1>
@@ -59,6 +60,7 @@ details.val ul{margin:8px 0 2px;padding-left:18px}li.bad{color:#c0392b}
 <div class="lbl">Presets</div><div class="row" id="pre"></div>
 <div class="help">Accepts LaTeX copied from a question (<code>\( Z=\overline{AB+CD} \)</code>, <code>\cdot</code>, <code>\oplus</code>) or plain text (<code>Z=!(AB+CD)</code>). <b>+</b> is OR, letters together or <b>*</b> is AND, <b>'</b> or <b>!</b> is NOT. Several <code>\( … \)</code> equations in one paste are each drawn.</div>
 <div id="err"></div></div>
+<div id="prev"></div>
 <div id="st"></div>
 <div id="out"></div>
 </main>
@@ -301,7 +303,12 @@ return{n,ok:c&&r.every(q=>q.ok),chain:c,st:S.map((x,i)=>({t:x.title,ok:r[i].ok,b
 function showTests(){const R=runTests();$('st').innerHTML='<div class="card"><div class="st">Self-test</div><div class="sc"><table><tr><th>Expression</th><th>Stage</th><th>Checks</th><th>Diffusion breaks</th><th>Result</th></tr>'+
 R.flatMap(r=>r.err?[`<tr><td>${r.n}</td><td colspan="3">${r.err}</td><td>✗</td></tr>`]:r.st.map((s,i)=>`<tr><td>${i?'':r.n}</td><td style="text-align:left">${s.t}</td><td>${s.np}/${s.nc}</td><td>${s.br}</td><td>${s.ok?'✓':'✗'}</td></tr>`).concat([`<tr><td colspan="4" style="text-align:right">whole circuit equals the equation</td><td>${r.chain?'✓':'✗'}</td></tr>`])).join('')+'</table></div></div>';
 INFO.length=0;go()}
-function go(){const e=$('err');e.textContent='';let h='';INFO.length=0;const opt={sd:$('sd').checked,euler:$('eu').checked};
+function ov(n,p){if(n.t=='lit')return n.v+(n.neg?"'":'');if(n.t=='not')return '<span style="border-top:2px solid;padding-top:1px">'+ov(n.c)+'</span>';const h=n.t=='and'?n.c.map(c=>ov(c,1)).join('·'):n.c.map(c=>ov(c)).join(' + ');return n.t=='or'&&p?'('+h+')':h}
+function prev(){let h='';try{split($('eq').value).forEach(q=>{q=q.trim();if(!q)return;let r;
+if(window.katex&&/\\/.test(q)){try{r=katex.renderToString(q,{displayMode:true,throwOnError:false})}catch(x){}}
+if(!r){const P=parse(q);r='<div style="font-size:20px;font-style:italic">'+P.lhs+' = '+ov(P.tree)+'</div>'}h+='<div class="kx">'+r+'</div>'})}catch(x){}
+$('prev').innerHTML=h?'<div class="card"><div class="st">Your equation</div>'+h+'</div>':''}
+function go(){prev();const e=$('err');e.textContent='';let h='';INFO.length=0;const opt={sd:$('sd').checked,euler:$('eu').checked};
 try{split($('eq').value).forEach(q=>h+=block(q,opt))}catch(x){e.textContent=x.message;$('out').innerHTML='';return}
 $('out').innerHTML=h;
 document.querySelectorAll('#out .sc').forEach((d,i)=>{const v=d.querySelector('svg');if(!v)return;const b=document.createElement('button');b.className='dlb';b.textContent='Download SVG';
@@ -319,5 +326,5 @@ O.addEventListener('mouseover',e=>{const t=nt(e);if(!t)return;const s=t.ownerSVG
 O.addEventListener('mouseout',e=>{const t=nt(e);if(!t)return;const s=t.ownerSVGElement;if(!s.pin)hl(s,null)});
 O.addEventListener('click',e=>{const t=nt(e),s=(e.target.closest&&e.target.closest('svg.stk'));if(!s)return;
 const id=t?t.getAttribute('data-net'):null;s.pin=(id&&s.pin!==id)?id:null;hl(s,s.pin)});
-$('draw').onclick=go;$('clr').onclick=()=>{$('eq').value='';$('out').innerHTML=''};$('eq').addEventListener('input',go);$('sd').onchange=go;$('eu').onchange=go;$('tst').onclick=showTests;go()}
+window.addEventListener('load',prev);$('draw').onclick=go;$('clr').onclick=()=>{$('eq').value='';$('out').innerHTML=''};$('eq').addEventListener('input',go);$('sd').onchange=go;$('eu').onchange=go;$('tst').onclick=showTests;go()}
 </script></body></html>
