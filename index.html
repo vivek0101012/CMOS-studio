@@ -166,7 +166,8 @@ function dfs(v){if(out.length>=cap)return;if(path.length==E.length){out.push(pat
 for(const e of E){if(used.has(e.id))continue;let to=null;if(e.u===v)to=e.v;else if(e.v===v)to=e.u;else continue;used.add(e.id);path.push({id:e.id,lab:e.lab,from:v,to});dfs(to);path.pop();used.delete(e.id)}}
 [...new Set(E.flatMap(e=>[e.u,e.v]))].forEach(dfs);return out}
 let EU=null;
-if(opt.euler&&N>1){const En=eg(Ln),Ep=eg(Lp),tn=trails(En,20000),tp=trails(Ep,20000),kp=new Set(tp.map(t=>t.map(x=>x.id).join())),seen=new Set(),common=[];
+if(opt.force)addC(opt.force);
+else if(opt.euler&&N>1){const En=eg(Ln),Ep=eg(Lp),tn=trails(En,20000),tp=trails(Ep,20000),kp=new Set(tp.map(t=>t.map(x=>x.id).join())),seen=new Set(),common=[];
 tn.forEach(t=>{const k=t.map(x=>x.id).join();if(kp.has(k)&&!seen.has(k)){seen.add(k);common.push(k.split(',').map(Number))}});
 EU={En,Ep,tn,tp,common};
 if(common.length)common.slice(0,800).forEach(addC);
@@ -262,7 +263,7 @@ const np=ck.filter(c=>c.ok).length;
 const vh=`<details class="val ${V.ok?'ok':'bad'}"${V.ok?'':' open'}><summary>${V.ok?'✓ Verified against the schematic':'✗ Verification FAILED'} – ${np}/${ck.length} checks passed</summary><ul>${ck.map(c=>`<li class="${c.ok?'ok':'bad'}">${c.ok?'✓':'✗'} <b>${c.t}</b> – ${c.m}</li>`).join('')}</ul></details>`;
 return{html:svg+`<div class="netinfo">Hover or tap a diffusion region, metal line or contact to highlight its net.</div>`+vh,ok:V.ok,ck,breaks:nb,nT:N,o}}
 const pick=(()=>{let f=null;for(let i=0;i<Math.min(cands.length,60);i++){const r=build(cands[i]);f=f||r;if(r.ok)return r}return f})();
-if(EU)pick.eu=euHtml(EU,pick);
+if(EU){pick.eu=euHtml(EU,pick);pick.common=EU.common}
 return pick
 function euHtml(E,pk){const fmt=(G,T,nm,note)=>{const vs=[...new Set(G.flatMap(e=>[e.u,e.v]))],dg={};G.forEach(e=>{dg[e.u]=(dg[e.u]||0)+1;dg[e.v]=(dg[e.v]||0)+1});
 const sset=new Set([vs[0]]);let c=1;while(c){c=0;G.forEach(e=>{if(sset.has(e.u)!==sset.has(e.v)){sset.add(e.u);sset.add(e.v);c=1}})}
@@ -281,10 +282,13 @@ function varsOf(P){return[...new Set((function f(n){return n.t=='lit'?[n.v]:n.t=
 function block(txt,opt){const P=parse(txt),S=stages(P),vars=varsOf(P);
 if(vars.length>8)throw Error('Use at most 8 variables');
 let tr=0;S.forEach(x=>tr+=2*leaves(x.g));
-const R=S.map(x=>stick(x,opt)),okAll=R.every(r=>r.ok)&&chainOk(P,S,vars);
+const R=S.map(x=>stick(x,opt)),EX=R.map((r,i)=>{if(!r.common||r.common.length<2)return{h:'',ok:true};let h='',ok=true;const sel=r.o.join(),rest=r.common.filter(q=>q.join()!=sel),cap=rest.slice(0,60);
+h+=`<div class="cap">Other common Euler paths – ${r.common.length} in total, selected one shown above${rest.length>60?' (first 60 of '+rest.length+' drawn)':''}</div>`;
+cap.forEach((q,k)=>{const o=stick(S[i],{...opt,force:q});ok=ok&&o.ok;h+=`<div class="cap">Path ${k+1}: ${q.map(j=>(function f(n){return n})(null)||'').join('')}${(o.html.match(/gate order ([^<]*)</)||[])[1].replace(/ /g,'-')}</div><div class="sc">${o.html}</div>`});return{h,ok}}),
+okAll=R.every(r=>r.ok)&&EX.every(e=>e.ok)&&chainOk(P,S,vars);
 let h=`<h2>${P.lhs} = ${str(nnf(P.tree,false))}</h2><div class="card">${P.lhs} needs <b>${tr}</b> transistors (${tr/2} PMOS + ${tr/2} NMOS). Inputs: ${vars.join(', ')}.<br><span style="color:${okAll?'#15803d':'#c0392b'};font-weight:600">${okAll?'✓ Schematic and stick diagram verified: topology, connectivity and truth table all agree.':'✗ Verification failed – see the details under each stick diagram.'}</span></div>`;
 S.forEach((x,i)=>{h+=`<div class="card"><div class="st">${x.title}</div><div class="fn">Pull-down (NMOS): ${str(x.g)} &nbsp;|&nbsp; Pull-up (PMOS): ${str(dual(x.g))}</div>
-<div class="cap">CMOS circuit</div><div class="sc">${schem(x)}</div>${R[i].eu||''}<div class="cap">Stick diagram</div><div class="sc">${R[i].html}</div></div>`});
+<div class="cap">CMOS circuit</div><div class="sc">${schem(x)}</div>${R[i].eu||''}<div class="cap">Stick diagram (selected ordering)</div><div class="sc">${R[i].html}</div>${EX[i].h}</div>`});
 let t='<table><tr>'+vars.map(v=>`<th>${v}</th>`).join('')+`<th>${P.lhs}</th></tr>`;
 for(let m=0;m<(1<<vars.length);m++){const e={};vars.forEach((v,i)=>e[v]=!!((m>>(vars.length-1-i))&1));t+='<tr>'+vars.map(v=>`<td>${+e[v]}</td>`).join('')+`<td><b>${+ev(P.tree,e)}</b></td></tr>`}
 return h+`<div class="card"><div class="st">Truth table</div><div class="sc">${t}</table></div></div>`}
