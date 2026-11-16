@@ -78,8 +78,9 @@ const g=nnf(n,false);uid=0;lab(g);const S=[],cp=new Set();
 S.push({title:neg?'CMOS gate':'CMOS gate (gives the complement Y, an inverter follows)',g,out:neg?P.lhs:'Y'});
 if(!neg)S.push({title:'Output inverter',g:{t:'lit',v:'Y',neg:false,id:0},out:P.lhs});return S}
 /* schematic */
+const gp=(a,b)=>(a.t=='or'||b.t=='or')?.3:0;
 function sz(n){if(n.t=='lit')return[1,1];const s=n.c.map(sz);
-return n.t=='and'?[Math.max(...s.map(a=>a[0])),s.reduce((a,b)=>a+b[1],0)]:[s.reduce((a,b)=>a+b[0],0),Math.max(...s.map(a=>a[1]))+PD*2]}
+return n.t=='and'?[Math.max(...s.map(a=>a[0])),s.reduce((a,b)=>a+b[1],0)+n.c.slice(1).reduce((a,c,i)=>a+gp(n.c[i],c),0)]:[s.reduce((a,b)=>a+b[0],0),Math.max(...s.map(a=>a[1]))+PD*2]}
 function dr(n,x0,y0,p,sd){const[w,h]=sz(n),ax=x0+w*CW/2;let s='';
 if(n.t=='lit'){const m=y0+32,q=sd?-1:1,cx=ax+q*10,px=ax+q*4,an=q>0?'start':'end';
 s+=`<path d="M${ax} ${y0}V${y0+20}H${cx}M${cx} ${y0+44}H${ax}V${y0+CH}M${cx} ${y0+20}V${y0+27}M${cx} ${y0+30}V${y0+34}M${cx} ${y0+37}V${y0+44}M${px} ${y0+20}V${y0+44}"/>`;
@@ -87,7 +88,7 @@ s+=p?`<path d="M${ax-q*27} ${m}H${ax-q*3.5}"/><circle cx="${ax}" cy="${m}" r="3.
 s+=`<text x="${ax-q*31}" y="${m+4}" text-anchor="${q>0?'end':'start'}" style="stroke:none;font-weight:700">${L(n)}</text>`;
 s+=`<text x="${ax+q*14}" y="${y0+15}" text-anchor="${an}" style="stroke:none;font-size:10px;fill:var(--mut)">${p?'S':'D'}</text><text x="${ax+q*14}" y="${y0+58}" text-anchor="${an}" style="stroke:none;font-size:10px;fill:var(--mut)">${p?'D':'S'}</text>`;
 s+=`<circle cx="${cx}" cy="${y0+20}" r="2.5" class="d"/><circle cx="${cx}" cy="${y0+44}" r="2.5" class="d"/>`;return s}
-if(n.t=='and'){let y=y0;n.c.forEach(c=>{const[cw,ch]=sz(c);s+=dr(c,x0+(w-cw)*CW/2,y,p,sd);y+=ch*CH});return s}
+if(n.t=='and'){let y=y0;n.c.forEach((c,i)=>{const[cw,ch]=sz(c);s+=dr(c,x0+(w-cw)*CW/2,y,p,sd);y+=ch*CH;const g=i<n.c.length-1?gp(c,n.c[i+1])*CH:0;if(g){s+=`<path d="M${ax} ${y}V${y+g}"/>`;y+=g}});return s}
 let x=x0;const pad=PD*CH,ax0=[];
 n.c.forEach((c,i)=>{const[cw,ch]=sz(c),a=x+cw*CW/2;ax0.push(a);s+=dr(c,x,y0+pad,p,i>=n.c.length/2?1:0);
 s+=`<path d="M${a} ${y0}V${y0+pad}M${a} ${y0+pad+ch*CH}V${y0+h*CH}"/>`;x+=cw*CW});
