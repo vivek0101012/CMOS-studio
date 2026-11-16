@@ -49,10 +49,13 @@ details.val ul{margin:8px 0 2px;padding-left:18px}li.bad{color:#c0392b}
 <header class="top"><div class="wrap nav"><span class="logo">C</span>CMOS Studio<small>Runs in your browser</small></div></header>
 <main class="wrap">
 <section class="hero"><h1>From Boolean equation to <em>CMOS circuit</em> and stick diagram.</h1>
-<p>Paste an equation in latex format(get from gpt make sure its of complementary nature ) or a whole question. Get the pull-up and pull-down networks with source and drain marked, the stick diagram, and a truth table.</p></section>
+<p>Paste an equation or a whole question. Get the pull-up and pull-down networks with source and drain marked, the stick diagram, and a truth table.</p></section>
+<div class="card" id="how"><div class="st">How to use</div><ol style="text-align:left;margin:8px 0 0;padding-left:22px;line-height:1.8">
+<li>Upload a picture of your question to GPT and ask it to give the equation in <b>LaTeX format</b> (the complementary / inverted form, e.g. <code>\( Z=\overline{AB+CD} \)</code>).</li>
+<li>Paste that LaTeX into the box below and click <b>Draw</b>.</li></ol></div>
 <div class="card" id="inp">
 <textarea id="eq" rows="2" spellcheck="false" aria-label="Equation">\(Z=\overline{AB+CD}\)</textarea>
-<div class="row"><button class="go" id="draw">Draw</button><button id="clr">Clear</button><button onclick="window.print()">Print / save PDF</button><button id="tst">Run self-test</button><label class="chk"><input type="checkbox" id="eu"> Euler path ordering</label><label class="chk"><input type="checkbox" id="sd" checked> Show source/drain labels</label></div>
+<div class="row"><button class="go" id="draw">Draw</button><button id="clr">Clear</button><button onclick="window.print()">Print / save PDF</button><button id="tst">Run self-test</button><label class="chk"><input type="checkbox" id="eu" checked> Euler path ordering</label><label class="chk"><input type="checkbox" id="sd" checked> Show source/drain labels</label></div>
 <div class="lbl">Presets</div><div class="row" id="pre"></div>
 <div class="help">Accepts LaTeX copied from a question (<code>\( Z=\overline{AB+CD} \)</code>, <code>\cdot</code>, <code>\oplus</code>) or plain text (<code>Z=!(AB+CD)</code>). <b>+</b> is OR, letters together or <b>*</b> is AND, <b>'</b> or <b>!</b> is NOT. Several <code>\( … \)</code> equations in one paste are each drawn.</div>
 <div id="err"></div></div>
@@ -309,7 +312,7 @@ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{typ
 function hl(svg,id){svg.querySelectorAll('[data-net]').forEach(e=>e.classList.toggle('hl',!!id&&e.getAttribute('data-net')===id));svg.classList.toggle('hlon',!!id);
 const b=svg.parentNode.querySelector('.netinfo');if(b)b.textContent=id?(INFO[+svg.getAttribute('data-d')]||{})[id]||'':DEF}
 if(typeof document!=='undefined'){
-[['Q7: Z = ¬(AB+CD)','\\(Z=\\overline{AB+CD}\\)',1],['Q8(a): Z = ¬(A(D+E)+BC)','\\(Z=\\overline{A(D+E)+BC}\\)',1],['Q8(b)/Q9: Z = ¬((A+B+C)(D+E))','\\(Z=\\overline{(A+B+C)(D+E)}\\)',1],['Q8(c): Z = A′B′+CD','Z=!((A+B)(C\'+D\'))',1],['NAND / simple: Z = ¬(AB)','Z=!(AB)',0],['NOR: Z = ¬(A+B)','Z=!(A+B)',0],['F = A(B+C)','\\(F=A(B+C)\\)',0]].forEach(([t,v,eu])=>{
+[['Q7: Z = ¬(AB+CD)','\\(Z=\\overline{AB+CD}\\)',1],['Q8(a): Z = ¬(A(D+E)+BC)','\\(Z=\\overline{A(D+E)+BC}\\)',1],['Q8(b)/Q9: Z = ¬((A+B+C)(D+E))','\\(Z=\\overline{(A+B+C)(D+E)}\\)',1],['Q8(c): Z = A′B′+CD','Z=!((A+B)(C\'+D\'))',1],['NAND / simple: Z = ¬(AB)','Z=!(AB)',1],['NOR: Z = ¬(A+B)','Z=!(A+B)',1],['F = A(B+C)','\\(F=A(B+C)\\)',1]].forEach(([t,v,eu])=>{
 const b=document.createElement('button');b.textContent=t;b.onclick=()=>{$('eq').value=v;$('eu').checked=!!eu;go()};$('pre').appendChild(b)});
 const O=$('out'),nt=e=>{const t=e.target.closest&&e.target.closest('[data-net]');return t&&t.ownerSVGElement&&t.ownerSVGElement.classList.contains('stk')?t:null};
 O.addEventListener('mouseover',e=>{const t=nt(e);if(!t)return;const s=t.ownerSVGElement;if(!s.pin)hl(s,t.getAttribute('data-net'))});
