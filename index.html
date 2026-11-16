@@ -112,41 +112,51 @@ let o=dp[n-1][0]<=dp[n-1][1]?0:1;const cost=dp[n-1][o],ori=[];for(let i=n-1;i>=0
 function stick(S){const g=S.g,u=dual(g),Ln=[],Lp=[];
 net(g,'OUT','GND',Ln,{k:1,pre:'n'});net(u,'VDD','OUT',Lp,{k:1,pre:'p'});
 const N=Ln.length,bn={},bp={};Ln.forEach(t=>bn[t.n.id]=t);Lp.forEach(t=>bp[t.n.id]=t);
-const P=90,M=70,X=k=>M+k*P+P/2,W=M+N*P+150;
-let ord=[...Array(N).keys()],bc=1e9;
-const xing=(R,re)=>{const mp={};R.cs.forEach(c=>(mp[c.net]=mp[c.net]||[]).push(c.x));const ks=Object.keys(mp).filter(k=>re.test(k)&&mp[k].length>1);let n=0;
-ks.forEach((k,i)=>{const lo=Math.min(...mp[k]),hi=Math.max(...mp[k]);Object.keys(mp).forEach(j=>{if(j==k||j=='OUT')return;if(!(!re.test(j)||ks.indexOf(j)>i))return;mp[j].forEach(x=>{if(x>lo&&x<hi)n++})})});return n};
-let bf=[0,0];
-const tryO=o=>{for(let f1=0;f1<2;f1++)for(let f2=0;f2<2;f2++){const a=chain(o.map(i=>bp[i]),f1).cost+chain(o.map(i=>bn[i]),f2).cost;const c=a*1000+xing(row(bp,1,o,f1),/^p\d/)+xing(row(bn,0,o,f2),/^n\d/);if(c<bc){bc=c;ord=[...o];bf=[f1,f2]}}};
-if(N<=7){const a=[...Array(N).keys()];(function pm(k){if(k==N){tryO(a);return}for(let i=k;i<N;i++){[a[k],a[i]]=[a[i],a[k]];pm(k+1);[a[k],a[i]]=[a[i],a[k]]}})(0)}else tryO(ord);
+const LM=140,P=100,M=210,X=k=>M+k*P+P/2,RX=M+N*P+72,W=Math.max(RX+70,520);
+let ord=[...Array(N).keys()],bc=1e9,bf=[0,0];
 function row(by,pm,od=ord,f){const seq=od.map(i=>by[i]),{ori}=chain(seq,f),cs=[],seg=[],lb=[];let st=0;
 seq.forEach((t,k)=>{const o=ori[k],l=lf(t,o),r=rt(t,o),sa=pm?'S':'D',sb=pm?'D':'S';lb.push(o?[sb,sa]:[sa,sb]);
 if(k==0){cs.push({net:l,x:X(0)-P/2});st=cs[0].x}
 else{const pr=rt(seq[k-1],ori[k-1]),mx=(X(k-1)+X(k))/2;
 if(pr==l)cs.push({net:l,x:mx});else{cs.push({net:pr,x:mx-16});seg.push([st,mx-16]);cs.push({net:l,x:mx+16});st=mx+16}}
 if(k==N-1){cs.push({net:r,x:X(k)+P/2});seg.push([st,X(k)+P/2])}});return{cs,seg,lb}}
-const Rp=row(bp,1,ord,bf[0]),Rn=row(bn,0,ord,bf[1]);
 const cnt=(R,re)=>{const m={};R.cs.forEach(c=>m[c.net]=(m[c.net]||0)+1);return Object.keys(m).filter(k=>re.test(k)&&m[k]>1)};
+const xing=(R,re)=>{const mp={};R.cs.forEach(c=>(mp[c.net]=mp[c.net]||[]).push(c.x));const ks=Object.keys(mp).filter(k=>re.test(k)&&mp[k].length>1);let n=0;
+ks.forEach((k,i)=>{const lo=Math.min(...mp[k]),hi=Math.max(...mp[k]);Object.keys(mp).forEach(j=>{if(j==k||j=='OUT')return;if(!(!re.test(j)||ks.indexOf(j)>i))return;mp[j].forEach(x=>{if(x>lo&&x<hi)n++})})});return n};
+const tryO=o=>{for(let f1=0;f1<2;f1++)for(let f2=0;f2<2;f2++){const a=chain(o.map(i=>bp[i]),f1).cost+chain(o.map(i=>bn[i]),f2).cost;const c=a*1000+2*xing(row(bp,1,o,f1),/^p\d/)+xing(row(bn,0,o,f2),/^n\d/);if(c<bc||(c==bc&&o.join()<ord.join())){bc=c;ord=[...o];bf=[f1,f2]}}};
+if(N<=7){const a=[...Array(N).keys()];(function pm(k){if(k==N){tryO(a);return}for(let i=k;i<N;i++){[a[k],a[i]]=[a[i],a[k]];pm(k+1);[a[k],a[i]]=[a[i],a[k]]}})(0)}else tryO(ord);
+const Rp=row(bp,1,ord,bf[0]),Rn=row(bn,0,ord,bf[1]);
 const ip=cnt(Rp,/^p\d/),inn=cnt(Rn,/^n\d/);
-const rv=26,pY=rv+52+14*ip.length,oY=pY+84,nY=oY+84,rg=nY+52+14*inn.length,H=rg+34;
-let s='';const B='#1f4fbf',G='#555',pts={};
-const rd=(R,y,fill,lt,ly)=>{R.seg.forEach(([a,b])=>s+=`<rect x="${a-18}" y="${y-12}" width="${b-a+36}" height="24" rx="4" fill="${fill}" opacity=".85"/>`);
-R.cs.forEach(c=>(pts[c.net]=pts[c.net]||[]).push({x:c.x,y}));
-R.lb.forEach((q,k)=>{s+=`<text x="${X(k)-10}" y="${ly}" text-anchor="end" style="font-weight:700">${q[0]}</text><text x="${X(k)+10}" y="${ly}" style="font-weight:700">${q[1]}</text>`});
-s+=`<text x="${W-44}" y="${y+6}" style="font-size:18px;font-style:italic;font-weight:700;fill:#222">${lt}</text>`};
-rd(Rp,pY,'#c9e24d','p',pY-18);rd(Rn,nY,'#2fa36b','n',nY+30);
-for(let k=0;k<N;k++){const t=bn[ord[k]],x=X(k);s+=`<line x1="${x}" x2="${x}" y1="${pY-22}" y2="${nY+22}" stroke="#e0463c" stroke-width="6" opacity=".92"/><line x1="${x-16}" x2="${x-4}" y1="${oY+40}" y2="${oY+40}" stroke="var(--fg)" stroke-width="2"/><text x="${x-20}" y="${oY+45}" text-anchor="end" style="font-weight:700">${L(t.n)}</text>`}
-const ln=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${G}" stroke-width="5" opacity=".9"/>`;
-s=`<line x1="10" x2="${W-20}" y1="${rv}" y2="${rv}" stroke="${B}" stroke-width="9" stroke-linecap="round"/><text x="${W-70}" y="${rv-10}" style="fill:${B};font-weight:700">Vdd</text><line x1="10" x2="${W-20}" y1="${rg}" y2="${rg}" stroke="${B}" stroke-width="9" stroke-linecap="round"/><text x="${W-70}" y="${rg+24}" style="fill:${B};font-weight:700">Gnd</text>`+s;
-for(const [nm,a] of Object.entries(pts)){let ty;
-if(nm=='VDD'){a.forEach(q=>s+=ln(q.x,q.y,q.x,rv));continue}
-if(nm=='GND'){a.forEach(q=>s+=ln(q.x,q.y,q.x,rg));continue}
-if(nm=='OUT')ty=oY;else if(a.length<2)continue;else if(nm[0]=='p')ty=pY-30-14*ip.indexOf(nm);else ty=nY+34+14*inn.indexOf(nm);
-a.forEach(q=>s+=ln(q.x,q.y,q.x,ty));const xs=a.map(q=>q.x),mx=nm=='OUT'?W-76:Math.max(...xs);const lo=Math.min(...xs),cx=[];if(nm!='OUT'){const pr=nm[0]=='p',ar=pr?ip:inn;Object.entries(pts).forEach(([j,bb])=>{if(j==nm||j=='OUT')return;const rail=j=='VDD'||j=='GND';if(rail?(pr?j=='VDD':j=='GND'):(j[0]==nm[0]&&bb.length>1&&ar.indexOf(j)>ar.indexOf(nm)))bb.forEach(q=>{if(q.x>lo&&q.x<mx)cx.push(q.x)})})}
-cx.sort((u,v)=>u-v);let sx=lo;cx.forEach(c=>{s+=ln(sx,ty,c-8,ty);sx=c+8});s+=ln(sx,ty,mx,ty);a.forEach(q=>{if(q.x>lo&&q.x<mx)s+=`<circle cx="${q.x}" cy="${ty}" r="4.5" fill="${G}"/>`});if(nm!='OUT')s+=`<text x="${mx+8}" y="${ty+4}" style="font-size:11px;fill:${G}">${nm}</text>`;
-if(nm=='OUT')s+=`<line x1="${W-76}" x2="${W-66}" y1="${oY}" y2="${oY}" stroke="var(--fg)" stroke-width="2"/><text x="${W-60}" y="${oY+5}" style="font-weight:700">${S.out}</text>`}
-for(const a of Object.values(pts))a.forEach(q=>s+=`<rect x="${q.x-8}" y="${q.y-8}" width="16" height="16" fill="none" stroke="#222" stroke-width="2.5"/><path d="M${q.x-8} ${q.y-8}L${q.x+8} ${q.y+8}M${q.x+8} ${q.y-8}L${q.x-8} ${q.y+8}" stroke="#222" stroke-width="2.5"/>`);
-return`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto">${s}</svg>`}
+const rv=64,pt=rv+60,pY=pt+64+26*Math.max(ip.length-1,0),oY=pY+100,nY=oY+100,lastT=nY+54+28*Math.max(inn.length-1,0),pb=lastT+36,rg=lastT+98,H=rg+100;
+const MB='#1e50d8',RD='#dc2626',YP='#f0b820',GN='#2aa85a',PU='#7c3aed',FF='font-family:system-ui,sans-serif;';
+let d='',po='',me='',co='',ju='',lb='';const pts={};
+const rd=(R,y,fill,ly)=>{R.seg.forEach(([a,b])=>d+=`<rect x="${a-12}" y="${y-20}" width="${b-a+24}" height="40" fill="${fill}"/>`);
+R.cs.forEach(c=>{if(/^[pn]\d/.test(c.net)&&!(ip.includes(c.net)||inn.includes(c.net)))return;(pts[c.net]=pts[c.net]||[]).push({x:c.x,y})});
+R.lb.forEach((q,k)=>{lb+=`<text x="${X(k)-12}" y="${ly}" text-anchor="end" style="font-weight:700;font-size:12px">${q[0]}</text><text x="${X(k)+12}" y="${ly}" style="font-weight:700;font-size:12px">${q[1]}</text>`})};
+rd(Rp,pY,YP,pY-27);rd(Rn,nY,GN,nY+39);
+const names=[];
+for(let k=0;k<N;k++){const t=bn[ord[k]],x=X(k);names.push(L(t.n));po+=`<rect x="${x-5}" y="${pt}" width="10" height="${pb-pt}" fill="${RD}"/>`;lb+=`<text x="${x}" y="${pt-12}" text-anchor="middle" style="${FF}font-size:20px;font-weight:700;fill:${RD}">${L(t.n)}</text>`}
+const ln=(x1,y1,x2,y2,c=MB)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="6"/>`;
+let jn=0;
+for(const [nm,a] of Object.entries(pts)){
+if(nm=='VDD'){a.forEach(q=>me+=ln(q.x,q.y,q.x,rv));continue}
+if(nm=='GND'){a.forEach(q=>me+=ln(q.x,q.y,q.x,rg));continue}
+const xs=a.map(q=>q.x),lo=Math.min(...xs),hi=Math.max(...xs);
+if(nm=='OUT'){a.forEach(q=>{me+=ln(q.x,q.y,q.x,oY)+`<circle cx="${q.x}" cy="${oY}" r="6.5" fill="${MB}"/>`});me+=ln(lo,oY,RX,oY)+`<text x="${RX+14}" y="${oY+7}" style="${FF}font-size:21px;font-weight:700;fill:${MB}">${S.out}</text>`;continue}
+if(a.length<2)continue;
+const pr=nm[0]=='p',ar=pr?ip:inn,idx=ar.indexOf(nm),ty=pr?pY-44-28*idx:nY+54+28*idx;
+let cross=false;Object.entries(pts).forEach(([j,bb])=>{if(j==nm||j=='OUT')return;const rail=j=='VDD'||j=='GND';if(rail?(pr?j=='VDD':j=='GND'):(j[0]==nm[0]&&bb.length>1&&ar.indexOf(j)>idx))bb.forEach(q=>{if(q.x>lo&&q.x<hi)cross=true})});
+a.forEach(q=>me+=ln(q.x,q.y,q.x,ty));
+if(cross){jn++;ju+=ln(lo,ty,hi,ty,PU);a.forEach(q=>ju+=`<rect x="${q.x-9}" y="${ty-9}" width="18" height="18" fill="#fff" stroke="${PU}" stroke-width="3.5"/>`);lb+=`<text x="${lo+14}" y="${ty+(pr?-14:32)}" style="${FF}font-size:15px;font-weight:700;fill:${PU}">m${jn}</text>`}
+else{me+=ln(lo,ty,hi,ty);lb+=`<text x="${lo+14}" y="${ty+(pr?-12:28)}" style="${FF}font-size:15px;font-weight:700;fill:${MB}">${nm}</text>`}}
+for(const a of Object.values(pts))a.forEach(q=>co+=`<rect x="${q.x-12}" y="${q.y-12}" width="24" height="24" fill="#fff" stroke="#111" stroke-width="3"/><path d="M${q.x-12} ${q.y-12}L${q.x+12} ${q.y+12}M${q.x+12} ${q.y-12}L${q.x-12} ${q.y+12}" stroke="#111" stroke-width="3"/>`);
+const rail=(y,txt)=>`<rect x="${LM}" y="${y-9}" width="${RX-LM}" height="18" fill="${MB}"/><text x="${LM-12}" y="${y+6}" text-anchor="end" style="${FF}font-size:17px;font-weight:700;fill:${MB}">${txt}</text>`;
+const side=(y,a,b,c)=>`<text x="${LM-12}" y="${y-3}" text-anchor="end" style="${FF}font-size:14px;fill:${c}">${a}</text><text x="${LM-12}" y="${y+14}" text-anchor="end" style="${FF}font-size:14px;fill:${c}">${b}</text>`;
+const ly=rg+52,it=[['Metal',`<rect x="0" y="-5" width="22" height="10" fill="${MB}"/>`],['Poly',`<rect x="0" y="-5" width="22" height="10" fill="${RD}"/>`],['n-diff',`<rect x="0" y="-5" width="22" height="10" fill="${GN}"/>`],['p-diff',`<rect x="0" y="-5" width="22" height="10" fill="${YP}"/>`],['Contact',`<rect x="4" y="-7" width="14" height="14" fill="#fff" stroke="#111" stroke-width="2"/><path d="M4 -7L18 7M18 -7L4 7" stroke="#111" stroke-width="2"/>`],['Metal-2 jumper',`<rect x="0" y="-3" width="22" height="6" fill="${PU}"/>`],['Via',`<rect x="4" y="-7" width="14" height="14" fill="#fff" stroke="${PU}" stroke-width="3"/>`]];
+const lg=it.map(([t,s],k)=>`<g transform="translate(${24+(k%4)*(W-40)/4},${ly+Math.floor(k/4)*28})">${s}<text x="30" y="4" style="font-size:12px">${t}</text></g>`).join('');
+const tstr=g.t=='lit'?L(g)+"'":'('+str(g).replace(/·/g,'')+")'";
+const title=`${S.out} = ${tstr} – gate order ${names.join(' ')}`;
+return`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="max-width:100%;height:auto"><text x="${W/2}" y="28" text-anchor="middle" style="${FF}font-size:18px;font-weight:700">${title}</text>${rail(rv,'VDD')}${rail(rg,'GND')}${d}${po}${me}${co}${ju}${lb}${side(pY,'p-diff','(pMOS)','#b8860b')}${side(nY,'n-diff','(nMOS)','#1f8a4c')}${lg}</svg>`}
 /*UI*/
 const $=id=>document.getElementById(id);
 function block(txt){const P=parse(txt),S=stages(P);
@@ -155,7 +165,7 @@ if(vars.length>8)throw Error('Use at most 8 variables');
 let tr=0;S.forEach(x=>tr+=2*leaves(x.g));
 let h=`<h2>${P.lhs} = ${str(nnf(P.tree,false)).replace(/^/,'')}</h2><div class="card">${P.lhs} needs <b>${tr}</b> transistors (${tr/2} PMOS + ${tr/2} NMOS). Inputs: ${vars.join(', ')}.</div>`;
 S.forEach(x=>{h+=`<div class="card"><div class="st">${x.title}</div><div class="fn">Pull-down (NMOS): ${str(x.g)} &nbsp;|&nbsp; Pull-up (PMOS): ${str(dual(x.g))}</div>
-<div class="cap">CMOS circuit</div><div class="sc">${schem(x)}</div><div class="cap">Stick diagram — red: poly, yellow-green: p-diffusion, green: n-diffusion, grey: metal, boxed X: contact, S/D: source/drain</div><div class="sc">${stick(x)}</div></div>`});
+<div class="cap">CMOS circuit</div><div class="sc">${schem(x)}</div><div class="cap">Stick diagram — S/D mark source and drain beside each gate</div><div class="sc">${stick(x)}</div></div>`});
 let t='<table><tr>'+vars.map(v=>`<th>${v}</th>`).join('')+`<th>${P.lhs}</th></tr>`;
 for(let m=0;m<(1<<vars.length);m++){const e={};vars.forEach((v,i)=>e[v]=!!((m>>(vars.length-1-i))&1));t+='<tr>'+vars.map(v=>`<td>${+e[v]}</td>`).join('')+`<td><b>${+ev(P.tree,e)}</b></td></tr>`}
 return h+`<div class="card"><div class="st">Truth table</div><div class="sc">${t}</table></div></div>`}
